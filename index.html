@@ -1,0 +1,1397 @@
+import React, { useState, useEffect } from 'react';
+
+// ==========================================
+// কনস্ট্যান্টস এবং প্রোডাক্ট গ্রুপ ম্যাপিং
+// ==========================================
+const GROUPS = {
+  UHP: { key: 'UHP', label: 'ইউনিহেলথ (UHP)', color: 'from-blue-500 to-blue-600', text: 'text-blue-600', bg: 'bg-blue-50' },
+  UMP: { key: 'UMP', label: 'ইউনিমেড (UMP)', color: 'from-teal-500 to-teal-600', text: 'text-teal-600', bg: 'bg-teal-50' },
+  UD: { key: 'UD', label: 'ইউনিডার্মা (UD)', color: 'from-indigo-500 to-indigo-600', text: 'text-indigo-600', bg: 'bg-indigo-50' },
+  NUV: { key: 'NUV', label: 'নিউলভা (NUV)', color: 'from-purple-500 to-purple-600', text: 'text-purple-600', bg: 'bg-purple-50' },
+  'S&N': { key: 'S&N', label: 'অন্যান্য (S&N)', color: 'from-emerald-500 to-emerald-600', text: 'text-emerald-600', bg: 'bg-emerald-50' }
+};
+
+// অটো-সাজেশনের জন্য ডেমো প্রোডাক্ট লিস্ট
+const SUGGESTED_PRODUCTS = [
+  { name: 'Fexo 120mg Tablet', group: 'UMP', packSize: 30, tradePrice: 240 },
+  { name: 'Fexo 180mg Tablet', group: 'UMP', packSize: 30, tradePrice: 330 },
+  { name: 'Rabe-20 Capsule', group: 'UHP', packSize: 50, tradePrice: 350 },
+  { name: 'DermaSoothe Cream 50g', group: 'UD', packSize: 1, tradePrice: 180 },
+  { name: 'Nervon Max Injection', group: 'NUV', packSize: 5, tradePrice: 600 },
+  { name: 'NutriJoint Tablet', group: 'S&N', packSize: 30, tradePrice: 900 },
+  { name: 'UniGrip Cold Tablet', group: 'UHP', packSize: 100, tradePrice: 200 },
+  { name: 'Cal-D Max Tablet', group: 'UMP', packSize: 30, tradePrice: 270 }
+];
+
+const INITIAL_FORM = {
+  salesCenter: 'ঢাকা সেন্ট্রাল ডিপো',
+  date: new Date().toISOString().split('T')[0],
+  chemistName: 'আল-মদিনা ফার্মেসি',
+  chemistAddress: 'ধানমন্ডি, ঢাকা',
+  chemistMobile: '01712345678',
+  formFilledBy: 'আনিসুর রহমান',
+  mpoName: 'কামরুল হাসান',
+  asmName: 'জহিরুল ইসলাম',
+  actionTaken: 'নতুন স্টক দ্বারা প্রতিস্থাপন করা হবে',
+  takenOverBy: 'মোঃ তারিকুল ইসলাম',
+  notes: 'শারীরিক ইনভেন্টরির সাথে ব্যাচ নম্বরগুলো যাচাই করা হয়েছে।',
+  invoiceNo: 'INV-2026-9001',
+  invoiceDate: new Date().toISOString().split('T')[0],
+  products: [
+    { id: '1', name: 'Fexo 120mg Tablet', group: 'UMP', packSize: 30, batchNo: 'FX99401', mfgDate: '2024-05-10', expiryDate: '2026-05-10', quantity: 15, tradePrice: 240, value: 120.00 },
+    { id: '2', name: 'Rabe-20 Capsule', group: 'UHP', packSize: 50, batchNo: 'RB33412', mfgDate: '2024-03-12', expiryDate: '2026-03-12', quantity: 20, tradePrice: 350, value: 140.00 }
+  ],
+  totals: { UHP: 140.00, UMP: 120.00, UD: 0, NUV: 0, 'S&N': 0, grand: 260.00 }
+};
+
+export default function App() {
+  const [currentPage, setCurrentPage] = useState('dashboard'); // 'dashboard' | 'new-form' | 'history' | 'analytics'
+  const [formTab, setFormTab] = useState('basic'); // 'basic' | 'products' (নতুন ফর্মের আলাদা ক্যাটাগরি ট্যাব)
+  const [forms, setForms] = useState([]);
+  const [currentForm, setCurrentForm] = useState(INITIAL_FORM);
+  const [theme, setTheme] = useState('light');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterGroup, setFilterGroup] = useState('all');
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+  const [editingFormId, setEditingFormId] = useState(null);
+  
+  // প্রোডাক্ট এন্ট্রি পপ-আপ স্টেট
+  const [isProductModalOpen, setIsProductModalOpen] = useState(false);
+  const [editingProductIndex, setEditingProductIndex] = useState(null); // নতুন নাকি এডিট হচ্ছে তা ট্র্যাক করার জন্য
+  const [productForm, setProductForm] = useState({
+    name: '',
+    group: 'UHP',
+    packSize: 10,
+    batchNo: '',
+    mfgDate: '',
+    expiryDate: '',
+    quantity: 0,
+    tradePrice: 0,
+    value: 0
+  });
+
+  // নোটিফিকেশন এবং কনফার্মেশন স্টেট
+  const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [confirmModalConfig, setConfirmModalConfig] = useState({ title: '', message: '', action: null });
+  const [showPdfPreview, setShowPdfPreview] = useState(false);
+
+  // অটো-সাজেশন ড্রপডাউন স্টেট
+  const [showSuggestions, setShowSuggestions] = useState(false);
+
+  // লোকাল স্টোরেজ থেকে ডেটা লোড করা
+  useEffect(() => {
+    const savedForms = localStorage.getItem('expiry_forms');
+    if (savedForms) {
+      setForms(JSON.parse(savedForms));
+    } else {
+      const initialForms = [{ ...INITIAL_FORM, id: 'EXP-101', createdAt: new Date().toISOString() }];
+      setForms(initialForms);
+      localStorage.setItem('expiry_forms', JSON.stringify(initialForms));
+    }
+  }, []);
+
+  // নোটিফিকেশন দেখানোর হেল্পার
+  const showNotification = (message, type = 'success') => {
+    setToast({ show: true, message, type });
+    setTimeout(() => setToast({ show: false, message: '', type: 'success' }), 3000);
+  };
+
+  // রিয়েল-টাইম ভ্যালু ক্যালকুলেশন ফর্মুলা: (Trade Price / Pack Size) * Quantity
+  const calculateValue = (tp, ps, qty) => {
+    const tradePrice = parseFloat(tp) || 0;
+    const packSize = parseFloat(ps) || 0;
+    const quantity = parseFloat(qty) || 0;
+    if (packSize <= 0) return 0;
+    return parseFloat(((tradePrice / packSize) * quantity).toFixed(2));
+  };
+
+  // প্রোডাক্ট ফর্ম ইনপুট চেঞ্জ হ্যান্ডলার
+  const handleProductInputChange = (field, value) => {
+    const updated = { ...productForm, [field]: value };
+    if (['tradePrice', 'packSize', 'quantity'].includes(field)) {
+      updated.value = calculateValue(updated.tradePrice, updated.packSize, updated.quantity);
+    }
+    setProductForm(updated);
+  };
+
+  // অটো-সাজেশন থেকে প্রোডাক্ট সিলেক্ট করা
+  const selectSuggestedProduct = (prod) => {
+    setProductForm({
+      ...productForm,
+      name: prod.name,
+      group: prod.group,
+      packSize: prod.packSize,
+      tradePrice: prod.tradePrice,
+      value: calculateValue(prod.tradePrice, prod.packSize, productForm.quantity)
+    });
+    setShowSuggestions(false);
+    showNotification(`${prod.name} সিলেক্ট করা হয়েছে`, 'success');
+  };
+
+  // পপ-আপ থেকে প্রোডাক্ট সেভ/আপডেট করা
+  const saveProductFromModal = () => {
+    if (!productForm.name) {
+      showNotification('অনুগ্রহ করে প্রোডাক্টের নাম লিখুন', 'error');
+      return;
+    }
+    if (productForm.packSize <= 0) {
+      showNotification('প্যাক সাইজ ০ এর চেয়ে বেশি হতে হবে', 'error');
+      return;
+    }
+    if (productForm.quantity <= 0) {
+      showNotification('পরিমাণ অবশ্যই ০ এর চেয়ে বেশি হতে হবে', 'error');
+      return;
+    }
+
+    let updatedProducts = [...currentForm.products];
+    if (editingProductIndex !== null) {
+      // এডিটিং মোড
+      updatedProducts[editingProductIndex] = { ...productForm };
+      showNotification('প্রোডাক্ট তথ্য আপডেট করা হয়েছে', 'success');
+    } else {
+      // নতুন যোগ করা
+      updatedProducts.push({ ...productForm, id: Date.now().toString() });
+      showNotification('নতুন প্রোডাক্ট যোগ করা হয়েছে', 'success');
+    }
+
+    const updatedTotals = recalculateTotals(updatedProducts);
+    setCurrentForm({ ...currentForm, products: updatedProducts, totals: updatedTotals });
+    setIsProductModalOpen(false);
+    setEditingProductIndex(null);
+  };
+
+  // প্রোডাক্ট এডিটের জন্য পপ-আপ ওপেন করা
+  const openEditProductModal = (index) => {
+    setEditingProductIndex(index);
+    setProductForm({ ...currentForm.products[index] });
+    setIsProductModalOpen(true);
+  };
+
+  // নতুন প্রোডাক্ট যোগ করার জন্য পপ-আপ ওপেন করা
+  const openAddProductModal = () => {
+    setEditingProductIndex(null);
+    setProductForm({
+      name: '',
+      group: 'UHP',
+      packSize: 10,
+      batchNo: '',
+      mfgDate: '',
+      expiryDate: '',
+      quantity: 0,
+      tradePrice: 0,
+      value: 0
+    });
+    setIsProductModalOpen(true);
+  };
+
+  // প্রোডাক্ট ডিলিট করা
+  const deleteProduct = (index) => {
+    const updatedProducts = currentForm.products.filter((_, i) => i !== index);
+    const updatedTotals = recalculateTotals(updatedProducts);
+    setCurrentForm({ ...currentForm, products: updatedProducts, totals: updatedTotals });
+    showNotification('প্রোডাক্ট তালিকা থেকে মুছে ফেলা হয়েছে', 'info');
+  };
+
+  // টোটাল হিসাব পুনর্গণনা করা
+  const recalculateTotals = (products) => {
+    const totals = { UHP: 0, UMP: 0, UD: 0, NUV: 0, 'S&N': 0, grand: 0 };
+    products.forEach(p => {
+      const val = calculateValue(p.tradePrice, p.packSize, p.quantity);
+      if (totals[p.group] !== undefined) {
+        totals[p.group] = parseFloat((totals[p.group] + val).toFixed(2));
+      } else {
+        totals['S&N'] = parseFloat((totals['S&N'] + val).toFixed(2));
+      }
+    });
+    totals.grand = parseFloat((totals.UHP + totals.UMP + totals.UD + totals.NUV + totals['S&N']).toFixed(2));
+    return totals;
+  };
+
+  // মূল ফর্ম ডেটা সেভ করা
+  const saveFormSubmission = () => {
+    if (!currentForm.salesCenter || !currentForm.chemistName || !currentForm.chemistMobile) {
+      showNotification('অনুগ্রহ করে প্রয়োজনীয় সব বেসিক তথ্য পূরণ করুন', 'error');
+      setFormTab('basic');
+      return;
+    }
+    if (currentForm.products.length === 0) {
+      showNotification('কমপক্ষে একটি প্রোডাক্ট যোগ করতে হবে', 'error');
+      setFormTab('products');
+      return;
+    }
+
+    let updatedForms = [...forms];
+    if (editingFormId) {
+      updatedForms = forms.map(f => f.id === editingFormId ? { ...currentForm, updatedAt: new Date().toISOString() } : f);
+      showNotification('প্রত্যাহার ফর্মটি সফলভাবে আপডেট করা হয়েছে');
+    } else {
+      const newForm = { ...currentForm, id: `EXP-${Date.now()}`, createdAt: new Date().toISOString() };
+      updatedForms = [newForm, ...updatedForms];
+      showNotification('নতুন প্রত্যাহার ফর্ম সফলভাবে সংরক্ষণ করা হয়েছে');
+    }
+
+    setForms(updatedForms);
+    localStorage.setItem('expiry_forms', JSON.stringify(updatedForms));
+    setEditingFormId(null);
+    setCurrentPage('dashboard');
+  };
+
+  // ফর্ম ডিলিট কনফার্মেশন
+  const confirmDeleteForm = (id) => {
+    setConfirmModalConfig({
+      title: 'ফর্ম মুছে ফেলার নিশ্চিতকরণ',
+      message: 'আপনি কি নিশ্চিতভাবে এই প্রত্যাহার ফর্মটি মুছে ফেলতে চান? এটি আর ফিরিয়ে আনা সম্ভব নয়।',
+      action: () => {
+        const filtered = forms.filter(f => f.id !== id);
+        setForms(filtered);
+        localStorage.setItem('expiry_forms', JSON.stringify(filtered));
+        showNotification('ফর্মটি সফলভাবে মুছে ফেলা হয়েছে', 'info');
+        setShowConfirmModal(false);
+      }
+    });
+    setShowConfirmModal(true);
+  };
+
+  // ১০টি প্রোডাক্ট আকারে এরে-কে ভাগ (Chunk) করার ডায়নামিক হেল্পার
+  const chunkProducts = (productsList, size = 10) => {
+    const chunks = [];
+    for (let i = 0; i < productsList.length; i += size) {
+      chunks.push(productsList.slice(i, i + size));
+    }
+    if (chunks.length === 0) chunks.push([]); // নুন্যতম ১টি খালি পেজ দেখানোর জন্য
+    return chunks;
+  };
+
+  // ডায়নামিক মাল্টি-পেজ পিডিএফ তৈরি এবং ডাউনলোড
+  const generateMultiPagePDF = async (claimData) => {
+    setIsGeneratingPDF(true);
+    showNotification('পিডিএফ ইঞ্জিন প্রস্তুত করা হচ্ছে...', 'info');
+
+    try {
+      if (!window.html2canvas) {
+        const loadScript = (url) => {
+          return new Promise((resolve, reject) => {
+            const script = document.createElement('script');
+            script.src = url;
+            script.onload = resolve;
+            script.onerror = reject;
+            document.head.appendChild(script);
+          });
+        };
+        await loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js');
+        await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
+      }
+
+      const element = document.getElementById('pdf-render-hidden-container');
+      element.style.display = 'block'; // পিডিএফ তৈরিকালীন রেন্ডার দেখানোর জন্য সাময়িক অন করা
+
+      const { jsPDF } = window.jspdf;
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pages = element.querySelectorAll('.pdf-page-sheet');
+
+      for (let i = 0; i < pages.length; i++) {
+        const canvas = await window.html2canvas(pages[i], {
+          scale: 2,
+          useCORS: true,
+          backgroundColor: '#FFFFFF',
+          logging: false
+        });
+        const imgData = canvas.toDataURL('image/png');
+        if (i > 0) pdf.addPage();
+        pdf.addImage(imgData, 'PNG', 0, 0, 210, 297, '', 'FAST');
+      }
+
+      const dateStr = claimData.date || new Date().toISOString().split('T')[0];
+      pdf.save(`expiry-form-${dateStr}.pdf`);
+      showNotification('পিডিএফ ফাইল সফলভাবে ডাউনলোড হয়েছে!', 'success');
+      element.style.display = 'none'; // রেন্ডার শেষ হলে আবার হাইড করা
+    } catch (err) {
+      console.error(err);
+      showNotification('পিডিএফ রেন্ডার করতে সমস্যা হয়েছে। অনুগ্রহ করে ডিভাইস প্রিন্ট ব্যবহার করুন।', 'error');
+    } finally {
+      setIsGeneratingPDF(false);
+    }
+  };
+
+  // ফিল্টার করা ফর্মের তালিকা
+  const filteredForms = forms.filter(form => {
+    const matchesSearch = 
+      form.chemistName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      form.salesCenter?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      form.id?.toLowerCase().includes(searchQuery.toLowerCase());
+    if (filterGroup === 'all') return matchesSearch;
+    return matchesSearch && form.products.some(p => p.group === filterGroup);
+  });
+
+  return (
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 flex flex-col font-sans transition-colors duration-300">
+      
+      {/* ==========================================
+          শীর্ষ হেডার এবং থিম চেঞ্জার
+          ========================================== */}
+      <header className="sticky top-0 z-40 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 shadow-sm px-4 py-3.5 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-blue-500 flex items-center justify-center text-white font-black text-xl shadow-md">
+            U
+          </div>
+          <div>
+            <h1 className="text-xs font-bold tracking-wider text-slate-400 dark:text-slate-500 uppercase">
+              UniMed UniHealth Pharmaceuticals
+            </h1>
+            <p className="text-base font-extrabold text-slate-800 dark:text-white leading-tight">
+              এক্সপায়ারি প্রোডাক্ট প্রত্যাহার সিস্টেম
+            </p>
+          </div>
+        </div>
+
+        <button 
+          onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
+          className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+        >
+          {theme === 'light' ? '🌙' : '☀️'}
+        </button>
+      </header>
+
+      {/* ==========================================
+          নেভিগেশন মেনু
+          ========================================== */}
+      <nav className="bg-slate-100 dark:bg-slate-950 px-4 py-2.5 flex items-center gap-1 overflow-x-auto border-b border-slate-200 dark:border-slate-800 scrollbar-none">
+        <button 
+          onClick={() => setCurrentPage('dashboard')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
+            currentPage === 'dashboard' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-800'
+          }`}
+        >
+          🏠 ড্যাশবোর্ড
+        </button>
+        <button 
+          onClick={() => {
+            setEditingFormId(null);
+            setCurrentForm(INITIAL_FORM);
+            setFormTab('basic');
+            setCurrentPage('new-form');
+          }}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
+            currentPage === 'new-form' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-800'
+          }`}
+        >
+          ➕ নতুন প্রত্যাহার ফর্ম
+        </button>
+        <button 
+          onClick={() => setCurrentPage('history')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
+            currentPage === 'history' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-800'
+          }`}
+        >
+          📋 প্রত্যাহার রেকর্ডস ({forms.length})
+        </button>
+      </nav>
+
+      {/* ==========================================
+          প্রধান পেজ রেন্ডার এরিয়া
+          ========================================== */}
+      <main className="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 space-y-6">
+
+        {/* ড্যাশবোর্ড ভিউ */}
+        {currentPage === 'dashboard' && (
+          <div className="space-y-6">
+            <div className="bg-gradient-to-r from-blue-700 via-indigo-700 to-indigo-900 rounded-3xl p-6 md:p-8 text-white relative overflow-hidden shadow-xl">
+              <div className="relative z-10 space-y-3 max-w-2xl">
+                <span className="bg-white/10 text-blue-200 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider">
+                  QISS কমপ্লায়েন্ট সিস্টেম
+                </span>
+                <h2 className="text-xl md:text-3xl font-black leading-tight">
+                  এক্সপায়ারড মেডিসিন ট্র্যাকিং ও দ্রুত ডিজিটাল রিটার্ন ফর্ম
+                </h2>
+                <p className="text-blue-100 text-sm leading-relaxed">
+                  আপনার রিপ্রেজেন্টেটিভদের দ্রুত ডেটা এন্ট্রি ও ইনস্ট্যান্ট অটো-ক্যালকুলেশন সহ ১০ প্রোডাক্টের ডায়নামিক পৃষ্ঠা বিভাজন বিশিষ্ট পিডিএফ প্রিন্ট করুন।
+                </p>
+                <button 
+                  onClick={() => {
+                    setEditingFormId(null);
+                    setCurrentForm(INITIAL_FORM);
+                    setFormTab('basic');
+                    setCurrentPage('new-form');
+                  }}
+                  className="bg-white hover:bg-slate-50 text-indigo-700 text-xs font-extrabold px-5 py-3 rounded-xl shadow-lg transition-transform active:scale-95 flex items-center gap-2"
+                >
+                  নতুন প্রত্যাহার ক্লেইম শুরু করুন ➔
+                </button>
+              </div>
+            </div>
+
+            {/* পরিসংখ্যান কার্ড */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="bg-white dark:bg-slate-800 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                <p className="text-xs font-bold text-slate-400">মোট ফর্ম রেকর্ড</p>
+                <p className="text-xl font-black text-slate-800 dark:text-white mt-1">{forms.length} টি ফর্ম</p>
+              </div>
+              <div className="bg-white dark:bg-slate-800 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                <p className="text-xs font-bold text-slate-400">সর্বমোট দাবি মূল্য</p>
+                <p className="text-xl font-black text-blue-600 dark:text-blue-400 mt-1">
+                  ৳ {forms.reduce((sum, f) => sum + (f.totals?.grand || 0), 0).toLocaleString()}
+                </p>
+              </div>
+              <div className="bg-white dark:bg-slate-800 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                <p className="text-xs font-bold text-slate-400">ইউনিহেলথ (UHP) টোটাল</p>
+                <p className="text-xl font-black text-teal-600 mt-1">
+                  ৳ {forms.reduce((sum, f) => sum + (f.totals?.UHP || 0), 0).toLocaleString()}
+                </p>
+              </div>
+              <div className="bg-white dark:bg-slate-800 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                <p className="text-xs font-bold text-slate-400">ইউনিমেড (UMP) টোটাল</p>
+                <p className="text-xl font-black text-purple-600 mt-1">
+                  ৳ {forms.reduce((sum, f) => sum + (f.totals?.UMP || 0), 0).toLocaleString()}
+                </p>
+              </div>
+            </div>
+
+            {/* সাম্প্রতিক এন্ট্রির লিস্ট */}
+            <div className="bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 p-6 space-y-4">
+              <h3 className="text-base font-extrabold text-slate-800 dark:text-white">সাম্প্রতিক ড্রাফট ও ফর্মসমূহ</h3>
+              <div className="divide-y divide-slate-100 dark:divide-slate-700">
+                {forms.slice(0, 5).map(f => (
+                  <div key={f.id} className="py-3 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-900 px-2 rounded-xl transition-all">
+                    <div>
+                      <p className="text-xs font-bold text-slate-400">{f.id} • {f.date}</p>
+                      <p className="text-sm font-extrabold">{f.chemistName}</p>
+                      <p className="text-xs text-slate-500">{f.salesCenter}</p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="font-extrabold text-sm text-blue-600">৳ {f.totals?.grand.toFixed(2)}</span>
+                      <button 
+                        onClick={() => {
+                          setCurrentForm(f);
+                          setShowPdfPreview(true);
+                        }}
+                        className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 text-xs"
+                      >
+                        📄 ভিউ
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* নতুন ফর্ম / এডিট ফর্ম পেজ */}
+        {currentPage === 'new-form' && (
+          <div className="space-y-6">
+            
+            {/* পৃথকীকৃত ফর্ম সেকশন ট্যাব */}
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-2.5 rounded-2xl shadow-sm">
+              <div className="flex gap-2">
+                <button 
+                  onClick={() => setFormTab('basic')}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                    formTab === 'basic' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100'
+                  }`}
+                >
+                  📝 ১. বেসিক তথ্য ও মেটাডেটা
+                </button>
+                <button 
+                  onClick={() => setFormTab('products')}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                    formTab === 'products' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100'
+                  }`}
+                >
+                  💊 ২. প্রোডাক্ট তালিকা এন্ট্রি ({currentForm.products.length})
+                </button>
+              </div>
+
+              <button 
+                onClick={openAddProductModal}
+                className="bg-teal-600 hover:bg-teal-700 text-white text-xs font-extrabold px-3 py-2 rounded-xl flex items-center gap-1.5 transition-all"
+              >
+                ⚡ নতুন প্রোডাক্ট যোগ করুন
+              </button>
+            </div>
+
+            {/* ট্যাব ১: বেসিক তথ্য ও মেটাডেটা */}
+            {formTab === 'basic' && (
+              <div className="bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 p-6 space-y-4 shadow-sm">
+                <h4 className="text-xs font-extrabold uppercase tracking-wider text-slate-400">ভিতরকার তথ্যসমূহ (Sales Center & Chemist Info)</h4>
+                
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="text-xs font-bold text-slate-400 block mb-1">সেলস সেন্টারের নাম *</label>
+                    <input 
+                      type="text" 
+                      value={currentForm.salesCenter}
+                      onChange={(e) => setCurrentForm({ ...currentForm, salesCenter: e.target.value })}
+                      className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-slate-400 block mb-1">তারিখ *</label>
+                    <input 
+                      type="date" 
+                      value={currentForm.date}
+                      onChange={(e) => setCurrentForm({ ...currentForm, date: e.target.value })}
+                      className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-slate-400 block mb-1">কেমিস্টের নাম *</label>
+                    <input 
+                      type="text" 
+                      value={currentForm.chemistName}
+                      onChange={(e) => setCurrentForm({ ...currentForm, chemistName: e.target.value })}
+                      className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm outline-none"
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="text-xs font-bold text-slate-400 block mb-1">কেমিস্টের ঠিকানা</label>
+                    <input 
+                      type="text" 
+                      value={currentForm.chemistAddress}
+                      onChange={(e) => setCurrentForm({ ...currentForm, chemistAddress: e.target.value })}
+                      className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-slate-400 block mb-1">মোবাইল নাম্বার *</label>
+                    <input 
+                      type="text" 
+                      value={currentForm.chemistMobile}
+                      onChange={(e) => setCurrentForm({ ...currentForm, chemistMobile: e.target.value })}
+                      className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="h-px bg-slate-100 dark:bg-slate-700 my-4" />
+
+                <h4 className="text-xs font-extrabold uppercase tracking-wider text-slate-400">হস্তান্তরকারী ও কর্মকর্তাদের তথ্য</h4>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div>
+                    <label className="text-xs font-bold text-slate-400 block mb-1">ফর্ম পূরণকারীর নাম</label>
+                    <input 
+                      type="text" 
+                      value={currentForm.formFilledBy}
+                      onChange={(e) => setCurrentForm({ ...currentForm, formFilledBy: e.target.value })}
+                      className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-slate-400 block mb-1">MPO নাম</label>
+                    <input 
+                      type="text" 
+                      value={currentForm.mpoName}
+                      onChange={(e) => setCurrentForm({ ...currentForm, mpoName: e.target.value })}
+                      className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-slate-400 block mb-1">ASM নাম</label>
+                    <input 
+                      type="text" 
+                      value={currentForm.asmName}
+                      onChange={(e) => setCurrentForm({ ...currentForm, asmName: e.target.value })}
+                      className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-slate-400 block mb-1">গ্রহণকারী (UUPL পক্ষে)</label>
+                    <input 
+                      type="text" 
+                      value={currentForm.takenOverBy}
+                      onChange={(e) => setCurrentForm({ ...currentForm, takenOverBy: e.target.value })}
+                      className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-end pt-4">
+                  <button 
+                    onClick={() => setFormTab('products')}
+                    className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-5 py-3 rounded-xl shadow-md"
+                  >
+                    পরবর্তী ধাপে যান (প্রোডাক্ট তালিকা) ➔
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* ট্যাব ২: প্রোডাক্ট তালিকা এন্ট্রি */}
+            {formTab === 'products' && (
+              <div className="space-y-4">
+                
+                {/* প্রোডাক্ট টেবিল ভিউ */}
+                <div className="bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm">
+                  <div className="flex items-center justify-between mb-4">
+                    <h4 className="text-sm font-extrabold text-slate-800 dark:text-white">সংযুক্ত প্রোডাক্টের তালিকা</h4>
+                    <button 
+                      onClick={openAddProductModal}
+                      className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3 py-2 rounded-xl flex items-center gap-1.5"
+                    >
+                      ➕ অ্যাড প্রোডাক্ট পপ-আপ
+                    </button>
+                  </div>
+
+                  {currentForm.products.length === 0 ? (
+                    <div className="text-center py-12 text-slate-400">
+                      <p className="font-bold">কোন প্রোডাক্ট যোগ করা হয়নি।</p>
+                      <p className="text-xs mt-1">উপরে ডান পাশের বাটন ক্লিক করে পপ-আপ এর মাধ্যমে নতুন প্রোডাক্ট যোগ করুন।</p>
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs">
+                        <thead>
+                          <tr className="bg-slate-100 dark:bg-slate-900 text-slate-500 font-bold border-b border-slate-200 dark:border-slate-700">
+                            <th className="p-3">প্রোডাক্টের নাম</th>
+                            <th className="p-3">গ্রুপ</th>
+                            <th className="p-3">প্যাক সাইজ</th>
+                            <th className="p-3">ব্যাচ নং</th>
+                            <th className="p-3">মেয়াদ শেষ</th>
+                            <th className="p-3">পরিমাণ</th>
+                            <th className="p-3">ট্রেড প্রাইস</th>
+                            <th className="p-3 text-right">মূল্য (টাকা)</th>
+                            <th className="p-3 text-center">অ্যাকশন</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
+                          {currentForm.products.map((p, index) => (
+                            <tr key={p.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50">
+                              <td className="p-3 font-extrabold">{p.name}</td>
+                              <td className="p-3 font-bold text-slate-500">{p.group}</td>
+                              <td className="p-3 font-mono">{p.packSize}</td>
+                              <td className="p-3 font-mono font-bold">{p.batchNo || '-'}</td>
+                              <td className="p-3 text-rose-500 font-bold">{p.expiryDate}</td>
+                              <td className="p-3 font-bold text-blue-600">{p.quantity}</td>
+                              <td className="p-3 font-mono">৳{p.tradePrice}</td>
+                              <td className="p-3 text-right font-extrabold text-blue-600">৳{(p.value || 0).toFixed(2)}</td>
+                              <td className="p-3 text-center space-x-2">
+                                <button 
+                                  onClick={() => openEditProductModal(index)}
+                                  className="text-indigo-600 dark:text-indigo-400 hover:underline font-bold"
+                                >
+                                  এডিট
+                                </button>
+                                <button 
+                                  onClick={() => deleteProduct(index)}
+                                  className="text-rose-500 hover:underline font-bold"
+                                >
+                                  মুছুন
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+
+                {/* টোটাল ক্যালকুলেশন সামারি */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="bg-white dark:bg-slate-800 p-6 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-sm space-y-2">
+                    <h5 className="text-xs font-bold text-slate-400 uppercase">গ্রুপ-ভিত্তিক সাবটোটাল</h5>
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      {Object.values(GROUPS).map(g => (
+                        <div key={g.key} className="flex justify-between p-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200/50 dark:border-slate-800">
+                          <span>{g.label}:</span>
+                          <span className="font-extrabold text-slate-800 dark:text-white">৳{(currentForm.totals?.[g.key] || 0).toFixed(2)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="bg-white dark:bg-slate-800 p-6 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col justify-between">
+                    <div>
+                      <h5 className="text-xs font-bold text-slate-400 uppercase">সর্বমোট ক্লেইম ভ্যালু</h5>
+                      <p className="text-3xl font-black text-blue-600 dark:text-blue-400 font-mono mt-1">
+                        ৳ {(currentForm.totals?.grand || 0).toFixed(2)}
+                      </p>
+                    </div>
+
+                    <div className="flex gap-2 justify-end mt-4">
+                      <button 
+                        onClick={() => {
+                          setCurrentForm(currentForm);
+                          setShowPdfPreview(true);
+                        }}
+                        className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 dark:bg-indigo-950/20 dark:hover:bg-indigo-900/40 dark:text-indigo-400 text-xs font-extrabold px-4 py-3 rounded-xl transition-all"
+                      >
+                        📄 পিডিএফ প্রিভিউ ({chunkProducts(currentForm.products).length} পেজ)
+                      </button>
+                      <button 
+                        onClick={saveFormSubmission}
+                        className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-extrabold px-6 py-3 rounded-xl shadow-lg shadow-blue-500/10 transition-all"
+                      >
+                        💾 ফর্মটি সংরক্ষণ করুন
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+            )}
+
+          </div>
+        )}
+
+        {/* হিস্টোরি / রেকর্ডস ভিউ */}
+        {currentPage === 'history' && (
+          <div className="space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h3 className="text-lg font-black">সংরক্ষিত প্রত্যাহার দাবিসমূহ</h3>
+                <p className="text-xs text-slate-400">লোকাল স্টোরেজে সংরক্ষিত সকল ক্লেইম ডেমো</p>
+              </div>
+
+              <div className="flex gap-2">
+                <input 
+                  type="text" 
+                  placeholder="কেমিস্টের নাম দিয়ে খুঁজুন..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs outline-none"
+                />
+                <select 
+                  value={filterGroup} 
+                  onChange={(e) => setFilterGroup(e.target.value)}
+                  className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs font-bold"
+                >
+                  <option value="all">সকল গ্রুপ</option>
+                  {Object.values(GROUPS).map(g => (
+                    <option key={g.key} value={g.key}>{g.label}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {filteredForms.length === 0 ? (
+              <div className="text-center py-12 text-slate-400 bg-white dark:bg-slate-800 rounded-3xl">
+                কোন রেকর্ড পাওয়া যায়নি।
+              </div>
+            ) : (
+              <div className="grid gap-4">
+                {filteredForms.map(form => (
+                  <div key={form.id} className="bg-white dark:bg-slate-800 p-5 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-mono bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 px-2 py-0.5 rounded font-bold">
+                          {form.id}
+                        </span>
+                        <span className="text-xs text-slate-400">{form.date}</span>
+                      </div>
+                      <h4 className="font-extrabold text-base text-slate-950 dark:text-white">{form.chemistName}</h4>
+                      <p className="text-xs text-slate-400">{form.salesCenter} • {form.products.length} টি প্রোডাক্ট</p>
+                    </div>
+
+                    <div className="flex items-center justify-between md:justify-end gap-6 border-t md:border-t-0 pt-3 md:pt-0 border-slate-100 dark:border-slate-700">
+                      <div className="text-left md:text-right">
+                        <span className="text-[10px] text-slate-400 font-bold block">সর্বমোট মূল্য</span>
+                        <span className="text-base font-black text-blue-600 dark:text-blue-400">৳ {form.totals?.grand.toFixed(2)}</span>
+                      </div>
+
+                      <div className="flex gap-1.5">
+                        <button 
+                          onClick={() => {
+                            setEditingFormId(form.id);
+                            setCurrentForm(form);
+                            setFormTab('basic');
+                            setCurrentPage('new-form');
+                          }}
+                          className="px-3 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-xs font-bold rounded-xl"
+                        >
+                          এডিট
+                        </button>
+                        <button 
+                          onClick={() => {
+                            setCurrentForm(form);
+                            setShowPdfPreview(true);
+                          }}
+                          className="px-3 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 dark:bg-indigo-950/20 dark:hover:bg-indigo-900/40 dark:text-indigo-400 text-xs font-bold rounded-xl"
+                        >
+                          ভিউ ও প্রিন্ট
+                        </button>
+                        <button 
+                          onClick={() => confirmDeleteForm(form.id)}
+                          className="px-3 py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 dark:bg-rose-950/20 dark:hover:bg-rose-900/40 dark:text-rose-400 text-xs font-bold rounded-xl"
+                        >
+                          মুছুন
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+      </main>
+
+      {/* ==========================================
+          ১. অ্যাডভান্সড প্রোডাক্ট এন্ট্রি পপ-আপ (Pop-up View Layout)
+          ========================================== */}
+      {isProductModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white dark:bg-slate-800 w-full max-w-xl p-6 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+            
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-700 pb-3">
+              <h4 className="text-base font-black text-slate-900 dark:text-white flex items-center gap-1.5">
+                💊 {editingProductIndex !== null ? 'প্রোডাক্ট তথ্য এডিট করুন' : 'নতুন প্রোডাক্ট যুক্ত করুন'}
+              </h4>
+              <button 
+                onClick={() => setIsProductModalOpen(false)}
+                className="p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* প্রোডাক্ট ফর্ম ইলিমেন্টস */}
+            <div className="space-y-3">
+              
+              {/* প্রোডাক্ট সিলেক্টর উইথ সাজেশন */}
+              <div className="relative">
+                <label className="text-[11px] font-bold text-slate-400 block mb-1">প্রোডাক্টের নাম *</label>
+                <input 
+                  type="text" 
+                  placeholder="যেমন- Fexo 120mg Tablet"
+                  value={productForm.name}
+                  onChange={(e) => {
+                    handleProductInputChange('name', e.target.value);
+                    setShowSuggestions(true);
+                  }}
+                  onFocus={() => setShowSuggestions(true)}
+                  className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500/20"
+                />
+                
+                {/* সাজেশন ড্রপডাউন */}
+                {showSuggestions && (
+                  <div className="absolute left-0 right-0 mt-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-lg z-50 max-h-40 overflow-y-auto">
+                    {SUGGESTED_PRODUCTS.filter(p => p.name.toLowerCase().includes(productForm.name.toLowerCase())).map((p, idx) => (
+                      <div 
+                        key={idx}
+                        onClick={() => selectSuggestedProduct(p)}
+                        className="px-3 py-2 text-xs hover:bg-slate-100 dark:hover:bg-slate-700 cursor-pointer font-semibold flex justify-between"
+                      >
+                        <span>{p.name}</span>
+                        <span className="text-[10px] text-slate-400 uppercase">{p.group}</span>
+                      </div>
+                    ))}
+                    {SUGGESTED_PRODUCTS.filter(p => p.name.toLowerCase().includes(productForm.name.toLowerCase())).length === 0 && (
+                      <div className="px-3 py-2 text-xs text-slate-400">কোন সাজেশন পাওয়া যায়নি, নিজে টাইপ করুন</div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* গ্রুপ এবং প্যাক সাইজ */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[11px] font-bold text-slate-400 block mb-1">গ্রুপ ক্যাটাগরি *</label>
+                  <select 
+                    value={productForm.group}
+                    onChange={(e) => handleProductInputChange('group', e.target.value)}
+                    className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm outline-none font-bold"
+                  >
+                    {Object.values(GROUPS).map(g => (
+                      <option key={g.key} value={g.key}>{g.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold text-slate-400 block mb-1">প্যাক সাইজ *</label>
+                  <input 
+                    type="number" 
+                    value={productForm.packSize}
+                    onChange={(e) => handleProductInputChange('packSize', parseInt(e.target.value) || 0)}
+                    className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm outline-none font-mono"
+                  />
+                </div>
+              </div>
+
+              {/* ব্যাচ এবং ডেটসমূহ */}
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="text-[11px] font-bold text-slate-400 block mb-1">ব্যাচ নং</label>
+                  <input 
+                    type="text" 
+                    placeholder="যেমন- BT991"
+                    value={productForm.batchNo}
+                    onChange={(e) => handleProductInputChange('batchNo', e.target.value.toUpperCase())}
+                    className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm outline-none font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold text-slate-400 block mb-1">উৎপাদন তারিখ</label>
+                  <input 
+                    type="date" 
+                    value={productForm.mfgDate}
+                    onChange={(e) => handleProductInputChange('mfgDate', e.target.value)}
+                    className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-1.5 text-xs outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold text-slate-400 block mb-1">মেয়াদ উত্তীর্ণ তারিখ *</label>
+                  <input 
+                    type="date" 
+                    value={productForm.expiryDate}
+                    onChange={(e) => handleProductInputChange('expiryDate', e.target.value)}
+                    className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-1.5 text-xs outline-none"
+                  />
+                </div>
+              </div>
+
+              {/* পরিমাণ এবং ট্রেড প্রাইস */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[11px] font-bold text-slate-400 block mb-1">পরিমাণ (Quantity) *</label>
+                  <input 
+                    type="number" 
+                    value={productForm.quantity}
+                    onChange={(e) => handleProductInputChange('quantity', parseInt(e.target.value) || 0)}
+                    className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm outline-none font-bold"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold text-slate-400 block mb-1">ট্রেড প্রাইস (Trade Price) *</label>
+                  <input 
+                    type="number" 
+                    value={productForm.tradePrice}
+                    onChange={(e) => handleProductInputChange('tradePrice', parseFloat(e.target.value) || 0)}
+                    className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm outline-none font-mono"
+                  />
+                </div>
+              </div>
+
+              {/* রিয়েল-টাইম ক্যালকুলেশন ভিউ হাইলাইটার */}
+              <div className="p-3 bg-blue-50 dark:bg-slate-900 rounded-2xl border border-blue-100 dark:border-slate-700 flex justify-between items-center">
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block">ক্যালকুলেশন মেথড</span>
+                  <span className="text-[11px] font-mono text-slate-600 dark:text-slate-400">
+                    ({productForm.tradePrice} / {productForm.packSize}) × {productForm.quantity}
+                  </span>
+                </div>
+                <div className="text-right">
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block">মোট মূল্য</span>
+                  <span className="text-lg font-black text-blue-600 dark:text-blue-400">
+                    ৳ {productForm.value.toFixed(2)}
+                  </span>
+                </div>
+              </div>
+
+            </div>
+
+            {/* অ্যাকশন বাটনসমূহ */}
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-700">
+              <button 
+                onClick={() => setIsProductModalOpen(false)}
+                className="px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold"
+              >
+                বাতিল করুন
+              </button>
+              <button 
+                onClick={saveProductFromModal}
+                className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-extrabold shadow-md"
+              >
+                {editingProductIndex !== null ? 'আপডেট করুন' : 'তালিকায় যোগ করুন'}
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* ==========================================
+          ২. ডায়নামিক মাল্টি-পেজ পিডিএফ ও প্রিন্ট প্রিভিউ মোডাল (১০ প্রোডাক্ট লিমিট)
+          ========================================== */}
+      {showPdfPreview && (
+        <div className="fixed inset-0 z-50 flex flex-col justify-end sm:justify-center items-center bg-slate-950/70 backdrop-blur-sm p-0 sm:p-4">
+          <div className="bg-white dark:bg-slate-800 w-full max-w-5xl h-[92vh] sm:h-[88vh] rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col overflow-hidden border border-slate-200 dark:border-slate-700">
+            
+            {/* প্রিভিউ মোডাল হেডার */}
+            <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between bg-slate-50 dark:bg-slate-900">
+              <div>
+                <h3 className="font-extrabold text-sm md:text-base">📄 ডিজিটাল ক্লেইম ফর্ম প্রিভিউ (ডায়নামিক পৃষ্ঠা বিভাজন)</h3>
+                <p className="text-[11px] text-slate-400 mt-0.5">প্রতি পৃষ্ঠায় সর্বোচ্চ ১০টি করে আইটেম ডায়নামিকালি বিভক্ত করা হয়েছে।</p>
+              </div>
+              <button 
+                onClick={() => setShowPdfPreview(false)}
+                className="px-3 py-1.5 rounded-lg bg-slate-200 hover:bg-rose-100 dark:bg-slate-800 text-xs font-bold text-slate-600 dark:text-slate-400"
+              >
+                বন্ধ করুন ✕
+              </button>
+            </div>
+
+            {/* প্রিভিউ বডি (স্ক্রোলযোগ্য পেজ তালিকা) */}
+            <div className="flex-1 overflow-y-auto p-4 md:p-8 bg-slate-100 dark:bg-slate-950/40 space-y-8">
+              
+              {/* ১০টি করে প্রোডাক্ট ডায়নামিকালি চ্যাংক বা পৃষ্ঠা বিভাজন করে প্রতিটি পৃষ্ঠা রেন্ডার করা */}
+              {chunkProducts(currentForm.products, 10).map((productChunk, pageIdx, allChunks) => (
+                <div 
+                  key={pageIdx}
+                  className="bg-white text-black p-6 md:p-10 shadow-lg mx-auto max-w-[210mm] border border-slate-300 font-sans relative"
+                  style={{ color: '#000000', backgroundColor: '#FFFFFF', minHeight: '297mm' }}
+                >
+                  
+                  {/* অফিশিয়াল ফর্ম আইডি এবং লোগো হেডার */}
+                  <div className="border border-black flex">
+                    <div className="w-[30%] border-r border-black p-3 flex flex-col items-center justify-center text-center">
+                      <div className="w-9 h-9 border border-black flex items-center justify-center font-black text-lg mb-1">U</div>
+                      <span className="text-[9px] font-bold">UniMed UniHealth</span>
+                      <span className="text-[8px]">Pharmaceuticals Ltd.</span>
+                    </div>
+
+                    <div className="flex-1 border-r border-black flex items-center justify-center p-2 text-center">
+                      <h2 className="text-xs md:text-sm font-black tracking-wide">EXPIRY PRODUCT WITHDRAWAL FORM</h2>
+                    </div>
+
+                    <div className="w-[28%] text-[8px] font-mono leading-relaxed divide-y divide-black flex flex-col justify-between">
+                      <div className="p-1 text-right">F-MRK-8.2.1-006</div>
+                      <div className="p-1 text-right">Revision: See QISS</div>
+                      <div className="p-1 text-right">Issue Date: See QISS</div>
+                      <div className="p-1 text-right">Page {pageIdx + 1} of {allChunks.length}</div>
+                    </div>
+                  </div>
+
+                  <p className="text-[9px] text-center italic font-bold my-2">*no replacement will be made on expired imported range of products*</p>
+
+                  {/* সেলস সেন্টার এবং বেসিক মেটাডেটা */}
+                  <div className="grid grid-cols-2 gap-4 text-[11px] font-semibold pb-2 border-b border-black">
+                    <div>সেলস সেন্টার: <span className="underline decoration-dotted font-bold">{currentForm.salesCenter || '.......................'}</span></div>
+                    <div className="text-right">তারিখ: <span className="underline decoration-dotted font-bold">{currentForm.date || '...........'}</span></div>
+                  </div>
+
+                  <h4 className="text-[10px] font-bold uppercase my-2">List of expired products (আইটেম {pageIdx * 10 + 1} - {pageIdx * 10 + productChunk.length}):</h4>
+
+                  {/* ডাইনামিক টেবিল */}
+                  <table className="w-full text-[10px] border-collapse border border-black mb-1">
+                    <thead>
+                      <tr className="bg-slate-50 border-b border-black">
+                        <th className="border-r border-black p-1">Products Name</th>
+                        <th className="border-r border-black p-1 w-[60px] text-center">Pack</th>
+                        <th className="border-r border-black p-1 w-[80px]">Batch No</th>
+                        <th className="border-r border-black p-1 w-[70px]">Mfg. Date</th>
+                        <th className="border-r border-black p-1 w-[70px]">Expiry</th>
+                        <th className="border-r border-black p-1 w-[60px] text-center">Qty</th>
+                        <th className="border-r border-black p-1 w-[70px]">Price</th>
+                        <th className="p-1 w-[90px] text-right">Value (Tk)</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {productChunk.map((row) => (
+                        <tr key={row.id} className="border-b border-black">
+                          <td className="border-r border-black p-1 font-bold">{row.name}</td>
+                          <td className="border-r border-black p-1 text-center font-mono">{row.packSize}</td>
+                          <td className="border-r border-black p-1 font-mono">{row.batchNo || '-'}</td>
+                          <td className="border-r border-black p-1 font-mono">{row.mfgDate || '-'}</td>
+                          <td className="border-r border-black p-1 font-mono font-bold text-rose-600">{row.expiryDate}</td>
+                          <td className="border-r border-black p-1 text-center font-bold font-mono">{row.quantity}</td>
+                          <td className="border-r border-black p-1 font-mono">৳{row.tradePrice}</td>
+                          <td className="p-1 text-right font-mono font-bold">৳{(row.value || 0).toFixed(2)}</td>
+                        </tr>
+                      ))}
+                      {/* যদি ১০টি ফিল না হয়, তাহলে বাকি রো খালি ঘর দিয়ে পূরণ করা (লেআউট অক্ষুণ্ন রাখতে) */}
+                      {productChunk.length < 10 && Array.from({ length: 10 - productChunk.length }).map((_, idx) => (
+                        <tr key={idx} className="border-b border-black h-5">
+                          <td className="border-r border-black p-1"></td>
+                          <td className="border-r border-black p-1"></td>
+                          <td className="border-r border-black p-1"></td>
+                          <td className="border-r border-black p-1"></td>
+                          <td className="border-r border-black p-1"></td>
+                          <td className="border-r border-black p-1"></td>
+                          <td className="border-r border-black p-1"></td>
+                          <td className="p-1"></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+
+                  <p className="text-[8px] font-bold">* Note: Loose strip and sample pack will not be accepted.</p>
+
+                  {/* সিগনেচার এবং সাবমিশন ব্লক শুধুমাত্র শেষ পেজে দেখাবে */}
+                  {pageIdx === allChunks.length - 1 ? (
+                    <div className="space-y-2 mt-2">
+                      <div className="text-[10px] border-b border-black pb-1">
+                        Expired products received from the Chemist: Name & Address: <span className="font-bold underline decoration-dotted">{currentForm.chemistName}, {currentForm.chemistAddress}</span>
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-2 text-[9px] pb-1 border-b border-black">
+                        <div>Form filled by: <span className="font-bold underline">{currentForm.formFilledBy || '....................'}</span></div>
+                        <div className="text-center">(Full Name of MPO/ASM)</div>
+                        <div className="text-right">Mobile No.: <span className="font-bold underline">{currentForm.chemistMobile}</span></div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4 text-[9px] py-1 border-b border-black">
+                        <div>Handed over by: <span className="underline">........................................</span> On behalf of Chemist</div>
+                        <div className="text-right">Taken over by: <span className="font-bold underline">{currentForm.takenOverBy || '.....................'}</span> On behalf of UUPL</div>
+                      </div>
+
+                      {/* গ্রুপ ওয়াইজ ব্রেকডাউন সামারি */}
+                      <div className="grid grid-cols-12 gap-2 text-[9px]">
+                        <div className="col-span-5 border border-black p-1.5 space-y-0.5">
+                          <span className="font-bold block uppercase tracking-wider text-[8px] border-b border-black pb-0.5">Products Value (Tk)</span>
+                          <div className="flex justify-between font-mono">UHP Tk.: <span>{(currentForm.totals.UHP || 0).toFixed(2)}</span></div>
+                          <div className="flex justify-between font-mono">UMP Tk.: <span>{(currentForm.totals.UMP || 0).toFixed(2)}</span></div>
+                          <div className="flex justify-between font-mono">UD Tk.: <span>{(currentForm.totals.UD || 0).toFixed(2)}</span></div>
+                          <div className="flex justify-between font-mono">NUV Tk.: <span>{(currentForm.totals.NUV || 0).toFixed(2)}</span></div>
+                          <div className="flex justify-between font-mono">S&N Tk.: <span>{(currentForm.totals['S&N'] || 0).toFixed(2)}</span></div>
+                        </div>
+
+                        <div className="col-span-4 border border-black p-1.5 flex flex-col justify-between">
+                          <div>
+                            <span className="font-bold text-[8px]">Full Name of MPO:</span>
+                            <span className="block border-b border-black font-semibold">{currentForm.mpoName}</span>
+                          </div>
+                          <div>
+                            <span className="font-bold text-[8px]">Full Name of ASM:</span>
+                            <span className="block border-b border-black font-semibold">{currentForm.asmName}</span>
+                          </div>
+                        </div>
+
+                        <div className="col-span-3 border border-black p-1.5 flex flex-col justify-between">
+                          <span className="font-bold text-[8px]">Action Taken:</span>
+                          <span className="font-semibold block">{currentForm.actionTaken}</span>
+                        </div>
+                      </div>
+
+                      <div className="border border-black p-1.5 text-[8px] leading-tight">
+                        <span className="font-bold">To: Sales Center In-charge.</span> Please arrange to collect the expired products from the chemist as per the list mentioned in this form and ensure replacement by equivalent value.
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4 text-[9px] pt-1">
+                        <div>Invoice No.: <span className="underline font-mono">{currentForm.invoiceNo}</span></div>
+                        <div className="text-right">Dated: <span className="underline font-mono">{currentForm.invoiceDate}</span></div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="mt-8 pt-4 border-t border-dashed border-slate-400 text-center text-xs text-slate-500 italic">
+                      পরবর্তী পৃষ্ঠায় সিগনেচার এবং গ্রুপ সাবটোটাল সামারি তালিকা অবিরত থাকবে...
+                    </div>
+                  )}
+
+                  {/* নিচের QISS কোড ফুট ওভারলে */}
+                  <div className="absolute bottom-2 left-6 right-6 border border-black grid grid-cols-12 text-[7px] font-mono leading-normal">
+                    <div className="col-span-3 border-r border-black p-1">Reviewed by: <span className="font-bold">SIT QSS</span></div>
+                    <div className="col-span-6 border-r border-black p-1 text-center">Uncontrolled once printed unless QISS cover sheet is attached.</div>
+                    <div className="col-span-3 p-1 text-right">Approved: <span className="font-bold">SEE QSS</span></div>
+                  </div>
+
+                </div>
+              ))}
+
+            </div>
+
+            {/* প্রিভিউ মোডাল ফুট বাটন */}
+            <div className="px-6 py-4 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 flex items-center justify-end gap-2">
+              <button 
+                onClick={() => setShowPdfPreview(false)}
+                className="px-5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200 text-xs font-bold"
+              >
+                বাতিল করুন
+              </button>
+              <button 
+                onClick={() => {
+                  window.print();
+                  showNotification('প্রিন্ট ডায়ালগ চালু করা হচ্ছে...', 'info');
+                }}
+                className="px-5 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-extrabold flex items-center gap-1.5"
+              >
+                📄 ডিভাইস দিয়ে প্রিন্ট করুন
+              </button>
+              <button 
+                onClick={() => generateMultiPagePDF(currentForm)}
+                disabled={isGeneratingPDF}
+                className="px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-black flex items-center gap-1.5"
+              >
+                {isGeneratingPDF ? 'রেন্ডারিং হচ্ছে...' : '📥 ডাউনলোড পিডিএফ'}
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* ==========================================
+          ৩. ব্যাকগ্রাউন্ডে পিডিএফ রেন্ডারের জন্য ডায়নামিক পৃষ্ঠা কন্টেইনার (হাইড করা থাকবে)
+          ========================================== */}
+      <div id="pdf-render-hidden-container" className="absolute left-[-9999px] top-[-9999px] hidden">
+        {chunkProducts(currentForm.products, 10).map((productChunk, pageIdx, allChunks) => (
+          <div 
+            key={pageIdx}
+            className="pdf-page-sheet bg-white text-black p-10 font-sans relative"
+            style={{ width: '210mm', height: '297mm', color: '#000000', backgroundColor: '#FFFFFF' }}
+          >
+            {/* হেডার */}
+            <div className="border border-black flex" style={{ borderColor: '#000' }}>
+              <div className="w-[30%] border-r border-black p-3 flex flex-col items-center justify-center text-center" style={{ borderColor: '#000' }}>
+                <div className="w-10 h-10 border border-black flex items-center justify-center font-black text-xl mb-1" style={{ borderColor: '#000' }}>U</div>
+                <span className="text-[10px] font-bold leading-tight">UniMed UniHealth</span>
+                <span className="text-[9px] leading-tight">Pharmaceuticals Ltd.</span>
+              </div>
+              <div className="flex-1 border-r border-black flex items-center justify-center p-3" style={{ borderColor: '#000' }}>
+                <h2 className="text-sm font-black tracking-wide text-center">EXPIRY PRODUCT WITHDRAWAL FORM</h2>
+              </div>
+              <div className="w-[30%] text-[10px] font-mono leading-relaxed divide-y divide-black flex flex-col justify-between" style={{ borderColor: '#000' }}>
+                <div className="p-1 text-right">F-MRK-8.2.1-006</div>
+                <div className="p-1 text-right" style={{ borderColor: '#000' }}>Revision: See QISS</div>
+                <div className="p-1 text-right" style={{ borderColor: '#000' }}>Issue Date: See QISS</div>
+                <div className="p-1 text-right" style={{ borderColor: '#000' }}>Page {pageIdx + 1} of {allChunks.length}</div>
+              </div>
+            </div>
+
+            <p className="text-[10px] text-center italic font-bold my-3">*no replacement will be made on expired imported range of products*</p>
+
+            <div className="grid grid-cols-2 gap-4 text-xs font-semibold pb-3 border-b border-black" style={{ borderColor: '#000' }}>
+              <div>Name of the Sales Center: <span className="underline font-bold">{currentForm.salesCenter || '........................'}</span></div>
+              <div className="text-right font-mono">Date: <span className="underline font-bold">{currentForm.date}</span></div>
+            </div>
+
+            <h4 className="text-xs font-bold uppercase my-2">List of expired products (আইটেম {pageIdx * 10 + 1} - {pageIdx * 10 + productChunk.length}):</h4>
+
+            <table className="w-full text-[10px] border-collapse border border-black mb-1" style={{ borderColor: '#000' }}>
+              <thead>
+                <tr className="bg-slate-100 border-b border-black" style={{ borderColor: '#000' }}>
+                  <th className="border-r border-black p-1" style={{ borderColor: '#000' }}>Products Name</th>
+                  <th className="border-r border-black p-1 w-[80px]" style={{ borderColor: '#000' }}>Pack Size</th>
+                  <th className="border-r border-black p-1 w-[80px]" style={{ borderColor: '#000' }}>Batch No</th>
+                  <th className="border-r border-black p-1 w-[85px]" style={{ borderColor: '#000' }}>Mfg. Date</th>
+                  <th className="border-r border-black p-1 w-[85px]" style={{ borderColor: '#000' }}>Expiry Date</th>
+                  <th className="border-r border-black p-1 w-[70px] text-center" style={{ borderColor: '#000' }}>Qty</th>
+                  <th className="border-r border-black p-1 w-[80px]" style={{ borderColor: '#000' }}>Price</th>
+                  <th className="p-1 w-[100px] text-right">Value (Tk)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {productChunk.map((row) => (
+                  <tr key={row.id} className="border-b border-black" style={{ borderColor: '#000' }}>
+                    <td className="border-r border-black p-1 font-bold" style={{ borderColor: '#000' }}>{row.name}</td>
+                    <td className="border-r border-black p-1 font-mono" style={{ borderColor: '#000' }}>{row.packSize}</td>
+                    <td className="border-r border-black p-1 font-mono" style={{ borderColor: '#000' }}>{row.batchNo || '-'}</td>
+                    <td className="border-r border-black p-1 font-mono" style={{ borderColor: '#000' }}>{row.mfgDate || '-'}</td>
+                    <td className="border-r border-black p-1 font-mono font-bold text-rose-600" style={{ borderColor: '#000' }}>{row.expiryDate}</td>
+                    <td className="border-r border-black p-1 font-mono text-center font-bold" style={{ borderColor: '#000' }}>{row.quantity}</td>
+                    <td className="border-r border-black p-1 font-mono" style={{ borderColor: '#000' }}>Tk. {row.tradePrice}</td>
+                    <td className="p-1 text-right font-mono font-bold">{(row.value || 0).toFixed(2)}</td>
+                  </tr>
+                ))}
+                {productChunk.length < 10 && Array.from({ length: 10 - productChunk.length }).map((_, idx) => (
+                  <tr key={idx} className="border-b border-black h-6" style={{ borderColor: '#000' }}>
+                    <td className="border-r border-black p-1" style={{ borderColor: '#000' }}></td>
+                    <td className="border-r border-black p-1" style={{ borderColor: '#000' }}></td>
+                    <td className="border-r border-black p-1" style={{ borderColor: '#000' }}></td>
+                    <td className="border-r border-black p-1" style={{ borderColor: '#000' }}></td>
+                    <td className="border-r border-black p-1" style={{ borderColor: '#000' }}></td>
+                    <td className="border-r border-black p-1" style={{ borderColor: '#000' }}></td>
+                    <td className="border-r border-black p-1" style={{ borderColor: '#000' }}></td>
+                    <td className="p-1"></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+
+            <p className="text-[9px] font-bold mt-1">Note: Loose strip and sample pack will not be accepted.</p>
+
+            {pageIdx === allChunks.length - 1 && (
+              <div className="space-y-2 mt-2">
+                <div className="text-[10px] border-b border-black pb-1.5" style={{ borderColor: '#000' }}>
+                  Expired products received from the Chemist: Name & Address: <span className="font-bold underline">{currentForm.chemistName}, {currentForm.chemistAddress}</span>
+                </div>
+
+                <div className="grid grid-cols-3 gap-2 text-[9px] pt-1 pb-2 border-b border-black" style={{ borderColor: '#000' }}>
+                  <div>Form filled by: <span className="font-bold underline">{currentForm.formFilledBy}</span></div>
+                  <div className="text-center">(Full Name of MPO/ASM)</div>
+                  <div className="text-right">Mobile No.: <span className="font-bold underline">{currentForm.chemistMobile}</span></div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4 text-[9px] py-2 border-b border-black" style={{ borderColor: '#000' }}>
+                  <div>Handed over by: <span className="underline">........................................</span> On behalf of Chemist</div>
+                  <div>Taken over by: <span className="font-bold underline">{currentForm.takenOverBy}</span> On behalf of UUPL</div>
+                </div>
+
+                <div className="grid grid-cols-12 gap-3 py-3 text-[10px]">
+                  <div className="col-span-4 border border-black p-2 space-y-1 rounded-sm" style={{ borderColor: '#000' }}>
+                    <span className="font-bold block uppercase tracking-wider text-[8px] border-b border-black pb-0.5" style={{ borderColor: '#000' }}>Products Value (Tk)</span>
+                    <div className="flex justify-between font-mono">UHP Tk.: <span>{(currentForm.totals.UHP || 0).toFixed(2)}</span></div>
+                    <div className="flex justify-between font-mono">UMP Tk.: <span>{(currentForm.totals.UMP || 0).toFixed(2)}</span></div>
+                    <div className="flex justify-between font-mono">UD Tk.: <span>{(currentForm.totals.UD || 0).toFixed(2)}</span></div>
+                    <div className="flex justify-between font-mono">NUV Tk.: <span>{(currentForm.totals.NUV || 0).toFixed(2)}</span></div>
+                    <div className="flex justify-between font-mono">S&N Tk.: <span>{(currentForm.totals['S&N'] || 0).toFixed(2)}</span></div>
+                  </div>
+
+                  <div className="col-span-4 border border-black p-2 space-y-2 rounded-sm flex flex-col justify-between" style={{ borderColor: '#000' }}>
+                    <div>
+                      <span className="font-bold block text-[8px]">Full Name of MPO:</span>
+                      <span className="block border-b border-black font-semibold" style={{ borderColor: '#000' }}>{currentForm.mpoName}</span>
+                    </div>
+                    <div>
+                      <span className="font-bold block text-[8px]">Full Name of ASM:</span>
+                      <span className="block border-b border-black font-semibold" style={{ borderColor: '#000' }}>{currentForm.asmName}</span>
+                    </div>
+                  </div>
+
+                  <div className="col-span-4 border border-black p-2 rounded-sm flex flex-col justify-between" style={{ borderColor: '#000' }}>
+                    <span className="font-bold block text-[8px]">Action Taken:</span>
+                    <span className="font-semibold block">{currentForm.actionTaken}</span>
+                  </div>
+                </div>
+
+                <div className="border border-black p-2 text-[9px] leading-relaxed mb-3" style={{ borderColor: '#000' }}>
+                  <span className="font-bold">To: Sales Center In-charge.</span> Please arrange to collect the expired products from the chemist as per the list mentioned in this form and ensure replacement of equivalent value.
+                </div>
+
+                <div className="grid grid-cols-2 gap-4 text-[10px] border-t border-black pt-3" style={{ borderColor: '#000' }}>
+                  <div>Received replaced vide Invoice No. <span className="font-bold font-mono">{currentForm.invoiceNo}</span></div>
+                  <div className="text-right">Dated: <span className="font-bold font-mono">{currentForm.invoiceDate}</span></div>
+                </div>
+              </div>
+            )}
+
+            {/* QISS ফুট ওভারলে */}
+            <div className="absolute bottom-4 left-10 right-10 border border-black grid grid-cols-12 text-[8px] font-mono p-1.5" style={{ borderColor: '#000' }}>
+              <div className="col-span-3 border-r border-black p-1" style={{ borderColor: '#000' }}>Reviewed by: <span className="font-bold">SIT QSS</span></div>
+              <div className="col-span-6 border-r border-black p-1 text-center" style={{ borderColor: '#000' }}>Printed copies are uncontrolled. Must include the QISS cover sheet.</div>
+              <div className="col-span-3 p-1 text-right">Approved By: <span className="font-bold">SEE QSS</span></div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* ==========================================
+          ৪. সিস্টেম কনফার্মেশন মডাল
+          ========================================== */}
+      {showConfirmModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white dark:bg-slate-800 w-full max-w-md p-6 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-2xl space-y-4">
+            <h4 className="text-lg font-bold text-slate-900 dark:text-white">{confirmModalConfig.title}</h4>
+            <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed">{confirmModalConfig.message}</p>
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button 
+                onClick={() => setShowConfirmModal(false)}
+                className="px-4 py-2 text-xs font-semibold rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-200"
+              >
+                না, ফিরে যান
+              </button>
+              <button 
+                onClick={confirmModalConfig.action}
+                className="px-5 py-2 text-xs font-extrabold rounded-xl bg-rose-600 hover:bg-rose-700 text-white"
+              >
+                হ্যাঁ, মুছে ফেলুন
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* রিয়াদ-টাইম টোস্ট নোটিফিকেশন */}
+      {toast.show && (
+        <div className="fixed bottom-4 right-4 z-50 animate-bounce">
+          <div className="px-5 py-3.5 rounded-2xl shadow-xl flex items-center gap-3 bg-slate-950 text-white text-xs font-bold border border-slate-800">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            {toast.message}
+          </div>
+        </div>
+      )}
+
+    </div>
+  );
+}
