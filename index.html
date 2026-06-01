@@ -452,11 +452,14 @@
                                 <input type="number" id="pTP" required min="0" step="0.01" class="input-field" placeholder="e.g. 450.00" oninput="calculateValue()">
                             </div>
                             
-                            <div class="bg-brand-50 border border-brand-100 rounded-lg p-3 flex flex-col justify-center items-center">
-                                <span class="text-xs text-brand-600 font-semibold uppercase tracking-wider">Calculated Value</span>
-                                <span class="text-xl font-bold text-brand-900 mt-1" id="pCalcValue">Tk. 0.00</span>
-                                <span class="text-[10px] text-gray-500 mt-1">(Trade Price / Pack Size) * Qty</span>
+                            <div class="sm:col-span-2 bg-brand-50 border border-brand-100 rounded flex justify-between items-center py-2 px-4 mt-2">
+                                <div class="flex flex-col">
+                                    <span class="text-xs text-brand-700 font-bold uppercase tracking-wide">Calculated Value</span>
+                                    <span class="text-[10px] text-gray-500">(Trade Price ÷ Pack Size) × Qty</span>
+                                </div>
+                                <span class="text-lg font-bold text-brand-900" id="pCalcValue">Tk. 0.00</span>
                             </div>
+
                         </form>
                     </div>
                     
@@ -922,9 +925,9 @@
                     <td class="px-4 py-3 text-right">${p.qty}</td>
                     <td class="px-4 py-3 text-right">${formatMoney(parseFloat(p.tp))}</td>
                     <td class="px-4 py-3 text-right font-semibold text-brand-700">${formatMoney(val)}</td>
-                    <td class="px-4 py-3 text-center">
-                        <button onclick="editProduct(${index})" class="text-blue-500 hover:text-blue-700 mr-2 p-1"><i class="fa-solid fa-pen-to-square"></i></button>
-                        <button onclick="deleteProduct(${index})" class="text-red-500 hover:text-red-700 p-1"><i class="fa-solid fa-trash-can"></i></button>
+                    <td class="px-4 py-3 text-center space-x-1">
+                        <button onclick="editProduct(${index})" class="bg-blue-100 text-blue-700 hover:bg-blue-200 px-2 py-1 rounded text-xs font-bold transition-colors shadow-sm"><i class="fa-solid fa-pen-to-square"></i> Edit</button>
+                        <button onclick="deleteProduct(${index})" class="bg-red-100 text-red-700 hover:bg-red-200 px-2 py-1 rounded text-xs font-bold transition-colors shadow-sm"><i class="fa-solid fa-trash-can"></i> Del</button>
                     </td>
                 `;
                 tbody.appendChild(tr);
@@ -985,8 +988,20 @@
                 form.products[editIndex] = product;
                 showToast('Product updated successfully', 'success');
             } else {
-                form.products.push(product);
-                showToast('Product added successfully', 'success');
+                // Check if identical product name already exists
+                const existingIndex = form.products.findIndex(p => p.name.trim().toLowerCase() === product.name.trim().toLowerCase());
+                
+                if (existingIndex >= 0) {
+                    // Merge quantities
+                    const oldQty = parseFloat(form.products[existingIndex].qty) || 0;
+                    const newQty = parseFloat(product.qty) || 0;
+                    form.products[existingIndex].qty = (oldQty + newQty).toString();
+                    
+                    showToast(`Quantity added to existing "${form.products[existingIndex].name}"`, 'success');
+                } else {
+                    form.products.push(product);
+                    showToast('Product added successfully', 'success');
+                }
             }
 
             saveDB();
@@ -1006,6 +1021,10 @@
         function editProduct(index) {
             const form = getActiveForm();
             const p = form.products[index];
+            
+            // ফিক্স: প্রথমে মোডাল ওপেন করতে হবে, এরপর এডিটের ভ্যালু বসাতে হবে
+            openModal(); 
+            
             document.getElementById('editIndex').value = index;
             document.getElementById('pName').value = p.name;
             document.getElementById('pGroup').value = p.group;
@@ -1017,7 +1036,6 @@
             document.getElementById('pTP').value = p.tp;
             
             calculateValue();
-            openModal();
             document.getElementById('modal-title').innerText = 'Edit Product';
         }
 
