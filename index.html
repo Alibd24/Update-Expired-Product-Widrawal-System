@@ -970,23 +970,24 @@
             const itemsPerPage = 10;
             const totalPages = Math.max(1, Math.ceil(totalProducts / itemsPerPage));
 
-            // Calculate Grand Totals across all products
-            let grandTotalsObj = { groups: {}, total: 0 };
-            GROUPS.forEach(g => grandTotalsObj.groups[g] = 0);
-
-            state.products.forEach(p => {
-                const val = (parseFloat(p.tp) / parseFloat(p.pack)) * parseFloat(p.qty);
-                if (grandTotalsObj.groups[p.group] !== undefined) {
-                    grandTotalsObj.groups[p.group] += val;
-                }
-                grandTotalsObj.total += val;
-            });
-
             // Generate HTML for each page chunk
             let fullHTML = '';
             for (let i = 0; i < totalPages; i++) {
                 const chunk = state.products.slice(i * itemsPerPage, (i + 1) * itemsPerPage);
-                fullHTML += generatePrintPageHTML(i, totalPages, chunk, grandTotalsObj);
+                
+                // Calculate Totals specifically for THIS page (chunk) only
+                let pageTotalsObj = { groups: {}, total: 0 };
+                GROUPS.forEach(g => pageTotalsObj.groups[g] = 0);
+
+                chunk.forEach(p => {
+                    const val = (parseFloat(p.tp) / parseFloat(p.pack)) * parseFloat(p.qty);
+                    if (pageTotalsObj.groups[p.group] !== undefined) {
+                        pageTotalsObj.groups[p.group] += val;
+                    }
+                    pageTotalsObj.total += val;
+                });
+
+                fullHTML += generatePrintPageHTML(i, totalPages, chunk, pageTotalsObj);
             }
 
             printContainer.innerHTML = fullHTML;
