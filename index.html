@@ -14,10 +14,6 @@
     <!-- FontAwesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
-    <!-- jsPDF & html2canvas -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-
     <script>
         tailwind.config = {
             theme: {
@@ -113,12 +109,14 @@
         @media print {
             @page {
                 size: A4;
-                margin: 10mm;
+                margin: 0; /* Remove browser default margins to control exactly in CSS */
             }
             body {
                 background: white;
                 margin: 0;
                 padding: 0;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
             }
             body > *:not(#print-area) {
                 display: none !important;
@@ -126,87 +124,28 @@
             #print-area {
                 display: block !important;
                 width: 100%;
-                font-family: 'Arial', sans-serif;
-                color: black;
-                font-size: 11px;
-                line-height: 1.3;
+            }
+            /* Strict A4 page enforcing */
+            .print-page {
+                width: 210mm !important;
+                height: 297mm !important;
+                margin: 0 !important;
+                padding: 10mm !important;
+                box-sizing: border-box !important;
+                page-break-after: always;
+                box-shadow: none !important; /* Hide shadow when printing */
+                background: white !important;
+            }
+            .print-page:last-child {
+                page-break-after: auto;
             }
 
-            /* Exact Replication Layout CSS */
-            .p-table {
-                width: 100%;
-                border-collapse: collapse;
-                margin-bottom: 10px;
-            }
-            .p-table th, .p-table td {
-                border: 1px solid black;
-                padding: 4px;
-                text-align: center;
-                word-wrap: break-word;
-            }
-            .p-table th {
-                font-weight: bold;
-                background-color: transparent;
-            }
-            .p-table-left td {
-                text-align: left;
-            }
+            /* Utilities for print */
             .dotted-line {
                 border-bottom: 1px dotted black;
                 display: inline-block;
                 min-width: 50px;
             }
-            .border-box {
-                border: 2px solid black;
-            }
-            .border-box-1 { border: 1px solid black; }
-            .font-bold { font-weight: bold; }
-            .text-center { text-align: center; }
-            .text-right { text-align: right; }
-            
-            .header-grid {
-                display: grid;
-                grid-template-columns: 18% 57% 25%;
-                border: 1.5px solid black;
-                margin-bottom: 15px;
-            }
-            .header-col {
-                border-right: 1.5px solid black;
-                padding: 5px;
-                display: flex;
-                flex-direction: column;
-                justify-content: center;
-            }
-            .header-col:last-child {
-                border-right: none;
-            }
-            
-            .info-row {
-                display: flex;
-                justify-content: space-between;
-                margin-bottom: 8px;
-            }
-            .val-table {
-                width: 100%;
-                border-collapse: collapse;
-                margin-top: 15px;
-                margin-bottom: 15px;
-            }
-            .val-table td {
-                padding: 4px 0;
-                vertical-align: bottom;
-            }
-            .footer-box {
-                border: 1.5px solid black;
-                display: grid;
-                grid-template-columns: 1fr 2fr 1fr;
-                margin-top: 20px;
-            }
-            .footer-col {
-                border-right: 1.5px solid black;
-                padding: 5px;
-            }
-            .footer-col:last-child { border-right: none; }
         }
     </style>
 </head>
@@ -416,7 +355,7 @@
             <div class="flex flex-col sm:flex-row justify-between items-center gap-4 bg-white rounded-xl shadow-sm border border-slate-200 p-4">
                 <div>
                     <h2 class="text-lg font-bold text-slate-800">Print Preview</h2>
-                    <p class="text-sm text-gray-500">Verify information before printing. The printout matches the official layout.</p>
+                    <p class="text-sm text-gray-500">Verify information before printing. Automatically creates new pages for more than 10 products.</p>
                 </div>
                 <div class="flex gap-3">
                     <button onclick="window.print()" class="ripple bg-brand-600 hover:bg-brand-700 text-white font-medium py-2 px-5 rounded-lg shadow-md transition-colors flex items-center gap-2">
@@ -426,10 +365,8 @@
             </div>
 
             <!-- Virtual Paper Container (Visual only on screen) -->
-            <div class="bg-gray-300 p-2 sm:p-8 rounded-xl overflow-x-auto flex justify-center">
-                <div class="bg-white shadow-2xl w-[210mm] min-w-[210mm] min-h-[297mm] p-[10mm] origin-top text-[11px] font-print leading-snug relative" style="color: black;" id="screen-preview-container">
-                    <!-- The content here will be injected by JS matching the #print-area -->
-                </div>
+            <div class="bg-gray-300 p-4 rounded-xl flex flex-col items-center gap-8 overflow-y-auto max-h-[80vh]" id="screen-preview-container">
+                <!-- Pages injected here by JS matching the #print-area -->
             </div>
         </div>
 
@@ -437,12 +374,10 @@
 
     <!-- ================= MODAL: ADD PRODUCT ================= -->
     <div id="productModal" class="fixed inset-0 z-50 hidden" aria-labelledby="modal-title" role="dialog" aria-modal="true">
-        <!-- Background backdrop -->
         <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity opacity-0" id="modalBackdrop"></div>
 
         <div class="fixed inset-0 z-10 w-screen overflow-y-auto">
             <div class="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
-                <!-- Modal panel -->
                 <div class="relative transform overflow-hidden rounded-xl bg-white text-left shadow-2xl transition-all sm:my-8 sm:w-full sm:max-w-2xl opacity-0 scale-95" id="modalPanel">
                     
                     <div class="bg-gradient-to-r from-brand-900 to-slate-800 px-6 py-4">
@@ -514,7 +449,6 @@
                         <button type="button" onclick="saveProduct(true)" class="ripple bg-brand-600 hover:bg-brand-700 text-white font-medium py-2 px-6 rounded-lg transition-colors shadow-sm">
                             Save & Close
                         </button>
-                        <!-- Added the "Save & Add Another" button -->
                         <button type="button" onclick="saveProduct(false)" class="ripple bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 px-6 rounded-lg transition-colors shadow-sm">
                             Save & Add Another
                         </button>
@@ -556,190 +490,9 @@
     </div>
 
 
-    <!-- ================= ACTUAL PRINT DOM (Hidden from screen) ================= -->
-    <div id="print-area">
-        <div style="width: 100%; max-width: 100%;">
-            
-            <!-- HEADER BOX -->
-            <div class="header-grid">
-                <div class="header-col text-center border-r-[1.5px] border-black">
-                    <div style="font-weight: bold; font-size: 24px; letter-spacing: -2px; border: 2px solid black; display: inline-block; padding: 2px 8px; line-height: 1; margin-bottom: 5px;">
-                        U<span style="font-size: 16px; vertical-align: top;">&#9632;</span>
-                    </div>
-                    <div class="font-bold" style="font-size: 12px; line-height: 1.1;">UniMed UniHealth</div>
-                    <div style="font-size: 10px;">Pharmaceuticals Ltd.</div>
-                </div>
-                <div class="header-col text-center" style="border-right: 1.5px solid black;">
-                    <div class="font-bold" style="font-size: 18px;">EXPIRY PRODUCT WITHDRAWAL FORM</div>
-                </div>
-                <div class="header-col" style="padding: 0; display: flex; flex-direction: column;">
-                    <div style="border-bottom: 1.5px solid black; padding: 4px 6px;">F-MRK-8.2.1-006</div>
-                    <div style="border-bottom: 1.5px solid black; padding: 4px 6px;">Revision: See QISS</div>
-                    <div style="border-bottom: 1.5px solid black; padding: 4px 6px;">Issue Date: See QISS</div>
-                    <div style="padding: 4px 6px;">Page 1 of 1</div>
-                </div>
-            </div>
-
-            <!-- Disclaimer -->
-            <div class="text-center font-bold" style="margin-bottom: 10px; font-size: 11px;">
-                *no replacement will be made on expired imported range of products*
-            </div>
-
-            <!-- Name and Date Line -->
-            <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
-                <div style="flex-grow: 1;">
-                    Name of the Sales Center <span class="dotted-line" style="width: 70%;" id="pr-salesCenter"></span>
-                </div>
-                <div style="min-width: 150px;">
-                    Date: <span class="dotted-line" style="width: 100px;" id="pr-date"></span>
-                </div>
-            </div>
-
-            <!-- List Label -->
-            <div style="margin-bottom: 5px;">List of expired products</div>
-
-            <!-- Products Table -->
-            <table class="p-table" id="pr-product-table">
-                <thead>
-                    <tr>
-                        <th style="width: 30%;">Products Name</th>
-                        <th style="width: 10%;">Pack Size</th>
-                        <th style="width: 10%;">Batch No</th>
-                        <th style="width: 10%;">Mfg. Date</th>
-                        <th style="width: 10%;">Expiry Date</th>
-                        <th style="width: 10%;">Quantity</th>
-                        <th style="width: 10%;">Trade Price</th>
-                        <th style="width: 10%;">Value</th>
-                    </tr>
-                </thead>
-                <tbody id="pr-product-tbody">
-                    <!-- Populated by JS -->
-                </tbody>
-            </table>
-
-            <!-- Notes & Chemist -->
-            <div style="margin-bottom: 5px;">Note: Loose strip and sample pack will not be accepted.</div>
-            <div style="margin-bottom: 15px;">
-                Expired products received from the Chemist: Name & Address: <span class="dotted-line" style="width: 50%;" id="pr-chemist"></span>
-                <div style="border-bottom: 1px dotted black; width: 100%; height: 15px;"></div>
-            </div>
-
-            <!-- Top Signatures -->
-            <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 10px; margin-bottom: 10px; line-height: 2;">
-                <div>
-                    Form filled by: <span class="dotted-line" style="width: 60%;" id="pr-filledBy"></span> (Full Name of MPO/ASM)
-                </div>
-                <div>
-                    Mobile No.: <span class="dotted-line" style="width: 80%;" id="pr-filledByMobile"></span>
-                </div>
-                <div>
-                    Handed over by: <span class="dotted-line" style="width: 70%;" id="pr-handedBy"></span>
-                </div>
-                <div>
-                    Taken over by: <span class="dotted-line" style="width: 70%;" id="pr-takenBy"></span>
-                </div>
-                <div style="padding-left: 20px;">
-                    On behalf of Chemist (Full Name) with Mobile No.<span class="dotted-line" style="width: 30%;" id="pr-handedByMobile"></span>
-                </div>
-                <div>
-                    On behalf of UUPL (Full Name)<br>
-                    Mobile No.: <span class="dotted-line" style="width: 70%;" id="pr-takenByMobile"></span>
-                </div>
-            </div>
-
-            <!-- Values Table (Group-wise and Grand Total) -->
-            <table class="val-table">
-                <thead>
-                    <tr>
-                        <th style="text-align: left; width: 25%;">Products Value (Tk)</th>
-                        <th style="text-align: left; width: 25%;">Full Name of MPO</th>
-                        <th style="text-align: left; width: 30%;">Full Name of ASM</th>
-                        <th style="text-align: left; width: 20%;">Action Taken</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td>UHP Tk.: <span class="dotted-line" style="width: 60%;" id="pr-v-UHP"></span></td>
-                        <td><span class="dotted-line" style="width: 90%;" id="pr-m-UHP"></span></td>
-                        <td><span class="dotted-line" style="width: 90%;" id="pr-a-UHP"></span></td>
-                        <td><span class="dotted-line" style="width: 90%;" id="pr-t-UHP"></span></td>
-                    </tr>
-                    <tr>
-                        <td>UMP Tk.: <span class="dotted-line" style="width: 60%;" id="pr-v-UMP"></span></td>
-                        <td><span class="dotted-line" style="width: 90%;" id="pr-m-UMP"></span></td>
-                        <td><span class="dotted-line" style="width: 90%;" id="pr-a-UMP"></span></td>
-                        <td><span class="dotted-line" style="width: 90%;" id="pr-t-UMP"></span></td>
-                    </tr>
-                    <tr>
-                        <td>UD Tk.: &nbsp;&nbsp;<span class="dotted-line" style="width: 60%;" id="pr-v-UD"></span></td>
-                        <td><span class="dotted-line" style="width: 90%;" id="pr-m-UD"></span></td>
-                        <td><span class="dotted-line" style="width: 90%;" id="pr-a-UD"></span></td>
-                        <td><span class="dotted-line" style="width: 90%;" id="pr-t-UD"></span></td>
-                    </tr>
-                    <tr>
-                        <td>NUV Tk.: <span class="dotted-line" style="width: 60%;" id="pr-v-NUV"></span></td>
-                        <td><span class="dotted-line" style="width: 90%;" id="pr-m-NUV"></span></td>
-                        <td><span class="dotted-line" style="width: 90%;" id="pr-a-NUV"></span></td>
-                        <td><span class="dotted-line" style="width: 90%;" id="pr-t-NUV"></span></td>
-                    </tr>
-                    <tr>
-                        <td>S&N Tk.: <span class="dotted-line" style="width: 60%;" id="pr-v-SN"></span></td>
-                        <td><span class="dotted-line" style="width: 90%;" id="pr-m-SN"></span></td>
-                        <td><span class="dotted-line" style="width: 90%;" id="pr-a-SN"></span></td>
-                        <td><span class="dotted-line" style="width: 90%;" id="pr-t-SN"></span></td>
-                    </tr>
-                    <!-- Added Grand Total Row here as requested -->
-                    <tr style="font-weight: bold; font-size: 12px; background-color: #f8f9fa;">
-                        <td style="padding-top: 10px; border-top: 1px solid #ccc;">
-                            Total Tk.: <span class="dotted-line" style="width: 60%; border-bottom: 2px solid black;" id="pr-v-TOTAL"></span>
-                        </td>
-                        <td style="border-top: 1px solid #ccc;"></td>
-                        <td style="border-top: 1px solid #ccc;"></td>
-                        <td style="border-top: 1px solid #ccc;"></td>
-                    </tr>
-                </tbody>
-            </table>
-
-            <!-- Bottom Note -->
-            <div style="margin-bottom: 20px;">
-                To<br>
-                Sales Center In-charge.<br>
-                Please arrange to collect the expired products from the chemist as per the list mentioned in this prescribed form and ensure replacement by any product of equivalent value as per business group.
-            </div>
-
-            <!-- Bottom Signatures -->
-            <div style="display: flex; justify-content: flex-end; margin-bottom: 20px;">
-                <div style="text-align: center; border-top: 1px solid black; padding-top: 5px; width: 250px;">
-                    Sr. Sales Team Member of<br>the concerned territory
-                </div>
-            </div>
-
-            <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 5px;">
-                <div style="flex-grow: 1;">
-                    Received expired products have been replaced vide invoice No. <span class="dotted-line" style="width: 30%;" id="pr-invoiceNo"></span> Dated <span class="dotted-line" style="width: 20%;" id="pr-invoiceDate"></span>
-                </div>
-                <div style="text-align: center; border-top: 1px solid black; padding-top: 5px; width: 200px;">
-                    Signature of SCM with date
-                </div>
-            </div>
-
-            <!-- Footer Box -->
-            <div class="footer-box text-[10px]">
-                <div class="footer-col border-r-[1.5px] border-black">
-                    <div>Reviewed by:</div><br><br>
-                    <div>SIT QSS</div>
-                </div>
-                <div class="footer-col border-r-[1.5px] border-black text-center" style="display: flex; align-items: center; justify-content: center; padding: 2px 10px;">
-                    If QISS cover sheet is not attached, then printed copies of this document are uncontrolled. Controlled copies must include the QISS cover sheet for revision information and stamped with "CONTROLLED COPY" in red with signature of the authorized person.
-                </div>
-                <div class="footer-col">
-                    <div>Approved By:</div><br><br>
-                    <div>SEE QSS</div>
-                </div>
-            </div>
-
-        </div>
-    </div>
+    <!-- ================= ACTUAL PRINT DOM ================= -->
+    <!-- Content injected dynamically via JS for pagination -->
+    <div id="print-area"></div>
 
 
     <script>
@@ -762,7 +515,7 @@
             state.details.groupMeta[g] = { mpo: '', asm: '', action: '' };
         });
 
-        // API Key - Ensure this is kept secret in a real environment
+        // API Key for Gemini (Auto Format & Scan)
         const apiKey = "";
 
         // ================= INITIALIZATION =================
@@ -849,7 +602,6 @@
             if(tabName === 'preview') {
                 saveState();
                 updatePreview();
-                renderScreenPreview();
             }
         }
 
@@ -946,7 +698,6 @@
             }, 300);
         }
 
-        // NEW: Accepts boolean to decide whether to close modal after save
         function saveProduct(closeModalAfterSave = true) {
             const form = document.getElementById('productForm');
             if (!form.checkValidity()) {
@@ -981,11 +732,10 @@
             if (closeModalAfterSave) {
                 closeModal();
             } else {
-                // Clear the form to add a new product
                 form.reset();
                 document.getElementById('editIndex').value = '-1';
                 document.getElementById('pCalcValue').innerText = 'Tk. 0.00';
-                document.getElementById('pName').focus(); // Refocus for quick entry
+                document.getElementById('pName').focus();
                 showToast('Ready for the next product', 'info');
             }
         }
@@ -1016,99 +766,233 @@
             }
         }
 
-        // ================= PRINT PREVIEW LOGIC =================
-        function updatePreview() {
-            const map = {
-                'salesCenter': 'pr-salesCenter',
-                'chemistDetails': 'pr-chemist',
-                'filledBy': 'pr-filledBy',
-                'filledByMobile': 'pr-filledByMobile',
-                'handedBy': 'pr-handedBy',
-                'handedByMobile': 'pr-handedByMobile',
-                'takenBy': 'pr-takenBy',
-                'takenByMobile': 'pr-takenByMobile',
-                'invoiceNo': 'pr-invoiceNo',
-            };
+        // ================= DYNAMIC MULTI-PAGE PRINT GENERATOR =================
+        function generatePrintPageHTML(pageIndex, totalPages, productsChunk, grandTotalsObj) {
             
-            for (let [stateKey, domId] of Object.entries(map)) {
-                const el = document.getElementById(domId);
-                if (el) el.innerText = state.details[stateKey] || '';
-            }
-
-            document.getElementById('pr-date').innerText = formatDateReadable(state.details.formDate);
-            document.getElementById('pr-invoiceDate').innerText = formatDateReadable(state.details.invoiceDate);
-
-            const tbody = document.getElementById('pr-product-tbody');
-            tbody.innerHTML = '';
-            
-            const minRows = 10;
-            const rowsCount = Math.max(minRows, state.products.length);
-            
-            let groupSums = { 'UHP': 0, 'UMP': 0, 'UD': 0, 'NUV': 0, 'S&N': 0, 'Others': 0 };
-            let grandTotal = 0; // NEW: Grand Total tracking
-
-            for (let i = 0; i < rowsCount; i++) {
-                const p = state.products[i];
-                const tr = document.createElement('tr');
-                
+            // Build 10 rows for the table
+            let tableRowsHTML = '';
+            for (let i = 0; i < 10; i++) {
+                const p = productsChunk[i];
                 if (p) {
                     const val = (parseFloat(p.tp) / parseFloat(p.pack)) * parseFloat(p.qty);
-                    
-                    let groupKey = p.group;
-                    if (groupSums[groupKey] !== undefined) {
-                        groupSums[groupKey] += val;
-                    }
-                    grandTotal += val; // Add to overall total
-                    
-                    tr.innerHTML = `
-                        <td class="p-table-left">${p.name}</td>
-                        <td>${p.pack}</td>
-                        <td>${p.batch || ''}</td>
-                        <td>${p.mfg || ''}</td>
-                        <td>${p.exp || ''}</td>
-                        <td>${p.qty}</td>
-                        <td>${formatMoney(parseFloat(p.tp))}</td>
-                        <td class="text-right pr-1">${formatMoney(val)}</td>
+                    tableRowsHTML += `
+                        <tr>
+                            <td style="border: 1px solid black; padding: 4px; text-align: left;">${p.name}</td>
+                            <td style="border: 1px solid black; padding: 4px; text-align: center;">${p.pack}</td>
+                            <td style="border: 1px solid black; padding: 4px; text-align: center;">${p.batch || ''}</td>
+                            <td style="border: 1px solid black; padding: 4px; text-align: center;">${p.mfg || ''}</td>
+                            <td style="border: 1px solid black; padding: 4px; text-align: center;">${p.exp || ''}</td>
+                            <td style="border: 1px solid black; padding: 4px; text-align: center;">${p.qty}</td>
+                            <td style="border: 1px solid black; padding: 4px; text-align: right;">${formatMoney(parseFloat(p.tp))}</td>
+                            <td style="border: 1px solid black; padding: 4px; text-align: right; padding-right: 6px;">${formatMoney(val)}</td>
+                        </tr>
                     `;
                 } else {
-                    tr.innerHTML = `
-                        <td>&nbsp;</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>
+                    tableRowsHTML += `
+                        <tr>
+                            <td style="border: 1px solid black; padding: 4px;">&nbsp;</td>
+                            <td style="border: 1px solid black; padding: 4px;"></td>
+                            <td style="border: 1px solid black; padding: 4px;"></td>
+                            <td style="border: 1px solid black; padding: 4px;"></td>
+                            <td style="border: 1px solid black; padding: 4px;"></td>
+                            <td style="border: 1px solid black; padding: 4px;"></td>
+                            <td style="border: 1px solid black; padding: 4px;"></td>
+                            <td style="border: 1px solid black; padding: 4px;"></td>
+                        </tr>
                     `;
                 }
-                tbody.appendChild(tr);
             }
 
-            // Populate Values Table
+            // Generate Group Value Rows
+            let valueTableRows = '';
             GROUPS.forEach(g => {
                 const safeG = g.replace('&', '');
-                const sum = groupSums[g] || 0;
-                const vEl = document.getElementById(`pr-v-${safeG}`);
-                if (vEl) {
-                    vEl.innerText = sum > 0 ? formatMoney(sum) : '';
-                }
+                const sum = grandTotalsObj.groups[g] || 0;
+                const meta = state.details.groupMeta[g] || {mpo: '', asm: '', action: ''};
+                const valStr = sum > 0 ? formatMoney(sum) : '';
                 
-                const meta = state.details.groupMeta[g] || {};
-                const mEl = document.getElementById(`pr-m-${safeG}`);
-                const aEl = document.getElementById(`pr-a-${safeG}`);
-                const tEl = document.getElementById(`pr-t-${safeG}`);
-                
-                if (mEl) mEl.innerText = meta.mpo || '';
-                if (aEl) aEl.innerText = meta.asm || '';
-                if (tEl) tEl.innerText = meta.action || '';
+                valueTableRows += `
+                    <tr>
+                        <td style="padding: 4px 0; vertical-align: bottom;">${g} Tk.: <span class="dotted-line" style="width: 60%;">${valStr}</span></td>
+                        <td style="padding: 4px 0; vertical-align: bottom;"><span class="dotted-line" style="width: 90%;">${meta.mpo}</span></td>
+                        <td style="padding: 4px 0; vertical-align: bottom;"><span class="dotted-line" style="width: 90%;">${meta.asm}</span></td>
+                        <td style="padding: 4px 0; vertical-align: bottom;"><span class="dotted-line" style="width: 90%;">${meta.action}</span></td>
+                    </tr>
+                `;
             });
 
-            // Set the Grand Total
-            const totalEl = document.getElementById('pr-v-TOTAL');
-            if(totalEl) {
-                totalEl.innerText = grandTotal > 0 ? formatMoney(grandTotal) : '';
-            }
+            const grandTotalStr = grandTotalsObj.total > 0 ? formatMoney(grandTotalsObj.total) : '';
+
+            // Main HTML template for one strictly sized A4 page
+            return `
+            <div class="print-page bg-white shadow-xl mx-auto flex flex-col justify-between" style="font-family: 'Arial', sans-serif; color: black; font-size: 11px; line-height: 1.3;">
+                <div>
+                    <!-- HEADER BOX -->
+                    <div style="display: grid; grid-template-columns: 18% 57% 25%; border: 1.5px solid black; margin-bottom: 12px;">
+                        <div style="border-right: 1.5px solid black; padding: 5px; text-align: center; display: flex; flex-direction: column; justify-content: center;">
+                            <div style="font-weight: bold; font-size: 22px; letter-spacing: -2px; border: 2px solid black; display: inline-block; padding: 1px 6px; line-height: 1; margin: 0 auto 4px auto; width: fit-content;">
+                                U<span style="font-size: 14px; vertical-align: top;">&#9632;</span>
+                            </div>
+                            <div style="font-weight: bold; font-size: 11px; line-height: 1.1;">UniMed UniHealth</div>
+                            <div style="font-size: 9px;">Pharmaceuticals Ltd.</div>
+                        </div>
+                        <div style="border-right: 1.5px solid black; padding: 5px; text-align: center; display: flex; flex-direction: column; justify-content: center;">
+                            <div style="font-weight: bold; font-size: 17px;">EXPIRY PRODUCT WITHDRAWAL FORM</div>
+                        </div>
+                        <div style="padding: 0; display: flex; flex-direction: column;">
+                            <div style="border-bottom: 1.5px solid black; padding: 3px 5px;">F-MRK-8.2.1-006</div>
+                            <div style="border-bottom: 1.5px solid black; padding: 3px 5px;">Revision: See QISS</div>
+                            <div style="border-bottom: 1.5px solid black; padding: 3px 5px;">Issue Date: See QISS</div>
+                            <div style="padding: 3px 5px;">Page ${pageIndex + 1} of ${totalPages}</div>
+                        </div>
+                    </div>
+
+                    <!-- Disclaimer -->
+                    <div style="text-align: center; font-weight: bold; margin-bottom: 8px; font-size: 11px;">
+                        *no replacement will be made on expired imported range of products*
+                    </div>
+
+                    <!-- Name and Date Line -->
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                        <div style="flex-grow: 1;">
+                            Name of the Sales Center <span class="dotted-line" style="width: 70%;">${state.details.salesCenter}</span>
+                        </div>
+                        <div style="min-width: 150px;">
+                            Date: <span class="dotted-line" style="width: 100px;">${formatDateReadable(state.details.formDate)}</span>
+                        </div>
+                    </div>
+
+                    <div style="margin-bottom: 5px;">List of expired products</div>
+
+                    <!-- Products Table -->
+                    <table style="width: 100%; border-collapse: collapse; margin-bottom: 8px;">
+                        <thead>
+                            <tr>
+                                <th style="width: 30%; border: 1px solid black; padding: 4px; font-weight: bold; background: transparent;">Products Name</th>
+                                <th style="width: 10%; border: 1px solid black; padding: 4px; font-weight: bold;">Pack Size</th>
+                                <th style="width: 10%; border: 1px solid black; padding: 4px; font-weight: bold;">Batch No</th>
+                                <th style="width: 10%; border: 1px solid black; padding: 4px; font-weight: bold;">Mfg. Date</th>
+                                <th style="width: 10%; border: 1px solid black; padding: 4px; font-weight: bold;">Expiry Date</th>
+                                <th style="width: 10%; border: 1px solid black; padding: 4px; font-weight: bold;">Quantity</th>
+                                <th style="width: 10%; border: 1px solid black; padding: 4px; font-weight: bold;">Trade Price</th>
+                                <th style="width: 10%; border: 1px solid black; padding: 4px; font-weight: bold;">Value</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${tableRowsHTML}
+                        </tbody>
+                    </table>
+
+                    <div style="margin-bottom: 5px;">Note: Loose strip and sample pack will not be accepted.</div>
+                    <div style="margin-bottom: 12px;">
+                        Expired products received from the Chemist: Name & Address: <span class="dotted-line" style="width: 50%;">${state.details.chemistDetails}</span>
+                        <div style="border-bottom: 1px dotted black; width: 100%; height: 12px;"></div>
+                    </div>
+
+                    <!-- Top Signatures -->
+                    <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 8px; margin-bottom: 8px; line-height: 1.8;">
+                        <div>Form filled by: <span class="dotted-line" style="width: 60%;">${state.details.filledBy}</span> (Full Name of MPO/ASM)</div>
+                        <div>Mobile No.: <span class="dotted-line" style="width: 80%;">${state.details.filledByMobile}</span></div>
+                        <div>Handed over by: <span class="dotted-line" style="width: 70%;">${state.details.handedBy}</span></div>
+                        <div>Taken over by: <span class="dotted-line" style="width: 70%;">${state.details.takenBy}</span></div>
+                        <div style="padding-left: 20px;">On behalf of Chemist (Full Name) with Mobile No.<span class="dotted-line" style="width: 30%;">${state.details.handedByMobile}</span></div>
+                        <div>On behalf of UUPL (Full Name)<br>Mobile No.: <span class="dotted-line" style="width: 70%;">${state.details.takenByMobile}</span></div>
+                    </div>
+
+                    <!-- Values Table -->
+                    <table style="width: 100%; border-collapse: collapse; margin-top: 10px; margin-bottom: 10px;">
+                        <thead>
+                            <tr>
+                                <th style="text-align: left; width: 25%;">Products Value (Tk)</th>
+                                <th style="text-align: left; width: 25%;">Full Name of MPO</th>
+                                <th style="text-align: left; width: 30%;">Full Name of ASM</th>
+                                <th style="text-align: left; width: 20%;">Action Taken</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${valueTableRows}
+                            <tr style="font-weight: bold; font-size: 12px; background-color: #f8f9fa;">
+                                <td style="padding-top: 8px; border-top: 1px solid #ccc;">
+                                    Total Tk.: <span class="dotted-line" style="width: 60%; border-bottom: 2px solid black;">${grandTotalStr}</span>
+                                </td>
+                                <td style="border-top: 1px solid #ccc;"></td>
+                                <td style="border-top: 1px solid #ccc;"></td>
+                                <td style="border-top: 1px solid #ccc;"></td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <div style="margin-bottom: 15px;">
+                        To<br>Sales Center In-charge.<br>
+                        Please arrange to collect the expired products from the chemist as per the list mentioned in this prescribed form and ensure replacement by any product of equivalent value as per business group.
+                    </div>
+                </div>
+
+                <!-- Footer Section pinned to bottom -->
+                <div>
+                    <div style="display: flex; justify-content: flex-end; margin-bottom: 15px;">
+                        <div style="text-align: center; border-top: 1px solid black; padding-top: 5px; width: 250px;">
+                            Sr. Sales Team Member of<br>the concerned territory
+                        </div>
+                    </div>
+
+                    <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 5px;">
+                        <div style="flex-grow: 1;">
+                            Received expired products have been replaced vide invoice No. <span class="dotted-line" style="width: 30%;">${state.details.invoiceNo}</span> Dated <span class="dotted-line" style="width: 20%;">${formatDateReadable(state.details.invoiceDate)}</span>
+                        </div>
+                        <div style="text-align: center; border-top: 1px solid black; padding-top: 5px; width: 200px;">
+                            Signature of SCM with date
+                        </div>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 2fr 1fr; border: 1.5px solid black; margin-top: 10px; font-size: 10px;">
+                        <div style="border-right: 1.5px solid black; padding: 5px;">
+                            <div>Reviewed by:</div><br><br><div>SIT QSS</div>
+                        </div>
+                        <div style="border-right: 1.5px solid black; padding: 2px 10px; display: flex; align-items: center; text-align: center;">
+                            If QISS cover sheet is not attached, then printed copies of this document are uncontrolled. Controlled copies must include the QISS cover sheet for revision information and stamped with "CONTROLLED COPY" in red with signature of the authorized person.
+                        </div>
+                        <div style="padding: 5px;">
+                            <div>Approved By:</div><br><br><div>SEE QSS</div>
+                        </div>
+                    </div>
+                </div>
+            </div>`;
         }
 
-        function renderScreenPreview() {
-            const source = document.getElementById('print-area');
-            const dest = document.getElementById('screen-preview-container');
-            dest.innerHTML = source.innerHTML;
+        function updatePreview() {
+            const printContainer = document.getElementById('print-area');
+            const screenContainer = document.getElementById('screen-preview-container');
+            
+            printContainer.innerHTML = ''; // clear
+            
+            const totalProducts = state.products.length;
+            const itemsPerPage = 10;
+            const totalPages = Math.max(1, Math.ceil(totalProducts / itemsPerPage));
+
+            // Calculate Grand Totals across all products
+            let grandTotalsObj = { groups: {}, total: 0 };
+            GROUPS.forEach(g => grandTotalsObj.groups[g] = 0);
+
+            state.products.forEach(p => {
+                const val = (parseFloat(p.tp) / parseFloat(p.pack)) * parseFloat(p.qty);
+                if (grandTotalsObj.groups[p.group] !== undefined) {
+                    grandTotalsObj.groups[p.group] += val;
+                }
+                grandTotalsObj.total += val;
+            });
+
+            // Generate HTML for each page chunk
+            let fullHTML = '';
+            for (let i = 0; i < totalPages; i++) {
+                const chunk = state.products.slice(i * itemsPerPage, (i + 1) * itemsPerPage);
+                fullHTML += generatePrintPageHTML(i, totalPages, chunk, grandTotalsObj);
+            }
+
+            printContainer.innerHTML = fullHTML;
+            screenContainer.innerHTML = fullHTML; // Mirror to UI
         }
+
 
         // ================= UTILITIES & API =================
         function confirmReset() {
