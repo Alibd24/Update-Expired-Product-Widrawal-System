@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Expiry Product Withdrawal Form - UniMed UniHealth</title>
+    <title>UUPL Expiry Form Management</title>
     
     <!-- Tailwind CSS (CDN) -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -48,10 +48,6 @@
         .animate-scale-up { animation: scaleUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
         .toast-enter { animation: slideInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
         
-        .stagger-1 { animation-delay: 0.1s; }
-        .stagger-2 { animation-delay: 0.2s; }
-        .stagger-3 { animation-delay: 0.3s; }
-
         /* Form Inputs */
         .input-field {
             @apply w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm transition-colors focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 bg-white/50 backdrop-blur-sm;
@@ -71,32 +67,6 @@
             @apply text-gray-600 hover:bg-gray-100 hover:text-gray-900;
         }
 
-        /* Ripple Effect */
-        .ripple {
-            position: relative;
-            overflow: hidden;
-        }
-        .ripple::after {
-            content: "";
-            position: absolute;
-            width: 100%;
-            height: 100%;
-            top: 0;
-            left: 0;
-            pointer-events: none;
-            background-image: radial-gradient(circle, #fff 10%, transparent 10.01%);
-            background-repeat: no-repeat;
-            background-position: 50%;
-            transform: scale(10, 10);
-            opacity: 0;
-            transition: transform .5s, opacity 1s;
-        }
-        .ripple:active::after {
-            transform: scale(0, 0);
-            opacity: .3;
-            transition: 0s;
-        }
-
         /* Scrollbar */
         ::-webkit-scrollbar { width: 8px; height: 8px; }
         ::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 4px; }
@@ -107,51 +77,22 @@
         #print-area { display: none; }
         
         @media print {
-            @page {
-                size: A4;
-                margin: 0; /* Remove browser default margins to control exactly in CSS */
-            }
-            body {
-                background: white;
-                margin: 0;
-                padding: 0;
-                -webkit-print-color-adjust: exact;
-                print-color-adjust: exact;
-            }
-            body > *:not(#print-area) {
-                display: none !important;
-            }
-            #print-area {
-                display: block !important;
-                width: 100%;
-            }
-            /* Strict A4 page enforcing */
+            @page { size: A4; margin: 0; }
+            body { background: white; margin: 0; padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            body > *:not(#print-area) { display: none !important; }
+            #print-area { display: block !important; width: 100%; }
             .print-page {
-                width: 210mm !important;
-                height: 297mm !important;
-                margin: 0 !important;
-                padding: 10mm !important;
-                box-sizing: border-box !important;
-                page-break-after: always;
-                box-shadow: none !important; /* Hide shadow when printing */
-                background: white !important;
+                width: 210mm !important; height: 297mm !important; margin: 0 !important;
+                padding: 10mm !important; box-sizing: border-box !important;
+                page-break-after: always; box-shadow: none !important; background: white !important;
             }
-            .print-page:last-child {
-                page-break-after: auto;
-            }
-
-            /* Utilities for print */
-            .dotted-line {
-                border-bottom: 1px dotted black;
-                display: inline-block;
-                min-width: 50px;
-            }
+            .print-page:last-child { page-break-after: auto; }
+            .dotted-line { border-bottom: 1px dotted black; display: inline-block; min-width: 50px; }
         }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-800 font-sans min-h-screen flex flex-col relative overflow-x-hidden">
 
-    <!-- Toast Notification Container -->
     <div id="toast-container" class="fixed top-5 right-5 z-50 flex flex-col gap-2"></div>
 
     <!-- App Header -->
@@ -159,51 +100,148 @@
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex items-center justify-between h-16">
                 <div class="flex items-center gap-3">
-                    <i class="fa-solid fa-notes-medical text-2xl text-brand-100"></i>
+                    <i class="fa-solid fa-pills text-2xl text-brand-100"></i>
                     <div>
-                        <h1 class="text-lg font-bold leading-tight">UUPL Form Generator</h1>
-                        <p class="text-xs text-brand-100 opacity-80">F-MRK-8.2.1-006 Expiry Product Withdrawal</p>
+                        <h1 class="text-lg font-bold leading-tight">UUPL Form Manager</h1>
+                        <p class="text-xs text-brand-100 opacity-80">Ali Akbar's Dashboard</p>
                     </div>
-                </div>
-                <div class="flex items-center gap-2">
-                    <button onclick="confirmReset()" class="text-sm px-3 py-1.5 text-red-300 hover:text-white hover:bg-red-500/20 rounded transition-colors flex items-center gap-2">
-                        <i class="fa-solid fa-trash-can"></i> <span class="hidden sm:inline">Reset Form</span>
-                    </button>
                 </div>
             </div>
             
             <!-- Navigation Tabs -->
             <nav class="flex space-x-2 pb-3 overflow-x-auto no-scrollbar" aria-label="Tabs">
-                <button onclick="switchTab('details')" id="tab-btn-details" class="tab-btn active flex items-center gap-2 whitespace-nowrap">
-                    <i class="fa-solid fa-file-lines"></i> 1. Form Details
+                <button onclick="switchTab('dashboard')" id="tab-btn-dashboard" class="tab-btn active flex items-center gap-2 whitespace-nowrap">
+                    <i class="fa-solid fa-chart-pie"></i> ড্যাশবোর্ড
                 </button>
-                <button onclick="switchTab('products')" id="tab-btn-products" class="tab-btn flex items-center gap-2 whitespace-nowrap">
-                    <i class="fa-solid fa-box-open"></i> 2. Add Products
+                <button onclick="switchTab('list')" id="tab-btn-list" class="tab-btn flex items-center gap-2 whitespace-nowrap">
+                    <i class="fa-solid fa-users"></i> ফর্ম তালিকা
+                </button>
+                
+                <div class="w-px h-6 bg-slate-600 mx-2 self-center hidden md:block"></div>
+                
+                <button onclick="switchTab('details')" id="tab-btn-details" class="tab-btn hidden items-center gap-2 whitespace-nowrap" disabled>
+                    <i class="fa-solid fa-file-lines"></i> ১. ফর্ম বিস্তারিত
+                </button>
+                <button onclick="switchTab('products')" id="tab-btn-products" class="tab-btn hidden items-center gap-2 whitespace-nowrap" disabled>
+                    <i class="fa-solid fa-box-open"></i> ২. প্রোডাক্টস
                     <span id="product-badge" class="ml-1 inline-flex items-center justify-center px-2 py-0.5 text-xs font-bold leading-none bg-brand-100 text-brand-900 rounded-full">0</span>
                 </button>
-                <button onclick="switchTab('preview')" id="tab-btn-preview" class="tab-btn flex items-center gap-2 whitespace-nowrap">
-                    <i class="fa-solid fa-print"></i> 3. Preview & Export
+                <button onclick="switchTab('preview')" id="tab-btn-preview" class="tab-btn hidden items-center gap-2 whitespace-nowrap" disabled>
+                    <i class="fa-solid fa-print"></i> ৩. প্রিভিউ
                 </button>
             </nav>
         </div>
     </header>
 
-    <!-- Main Content Area -->
     <main class="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
         
-        <!-- ================= TAB 1: FORM DETAILS ================= -->
-        <div id="tab-details" class="animate-fade-in block space-y-6">
+        <!-- ================= TAB 0: DASHBOARD ================= -->
+        <div id="tab-dashboard" class="animate-fade-in block space-y-6">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <!-- Summary Cards -->
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex items-center gap-4 hover:shadow-md transition-shadow">
+                    <div class="p-4 bg-brand-100 text-brand-600 rounded-full text-2xl"><i class="fa-solid fa-file-contract"></i></div>
+                    <div>
+                        <p class="text-sm text-slate-500 font-medium">মোট সেভ করা ফর্ম</p>
+                        <h3 class="text-2xl font-bold text-slate-800" id="dash-total-forms">0</h3>
+                    </div>
+                </div>
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex items-center gap-4 hover:shadow-md transition-shadow">
+                    <div class="p-4 bg-green-100 text-green-600 rounded-full text-2xl"><i class="fa-solid fa-money-bill-wave"></i></div>
+                    <div>
+                        <p class="text-sm text-slate-500 font-medium">সর্বমোট উইথড্রাল ভ্যালু</p>
+                        <h3 class="text-2xl font-bold text-slate-800" id="dash-total-value">Tk. 0.00</h3>
+                    </div>
+                </div>
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex items-center gap-4 hover:shadow-md transition-shadow">
+                    <div class="p-4 bg-orange-100 text-orange-600 rounded-full text-2xl"><i class="fa-solid fa-boxes-stacked"></i></div>
+                    <div>
+                        <p class="text-sm text-slate-500 font-medium">মোট প্রোডাক্ট এন্ট্রি</p>
+                        <h3 class="text-2xl font-bold text-slate-800" id="dash-total-products">0</h3>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- Group Wise Value List -->
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-0 overflow-hidden flex flex-col">
+                    <div class="bg-slate-50 px-6 py-4 border-b border-slate-200 flex justify-between items-center">
+                        <h3 class="text-lg font-bold text-slate-800"><i class="fa-solid fa-layer-group text-brand-500 mr-2"></i> Group Wise Value</h3>
+                    </div>
+                    <div class="p-6 flex-grow">
+                        <div id="group-summary-list" class="space-y-5">
+                            <!-- Populated by JS -->
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Month Wise Value List -->
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-0 overflow-hidden flex flex-col">
+                    <div class="bg-slate-50 px-6 py-4 border-b border-slate-200 flex justify-between items-center">
+                        <h3 class="text-lg font-bold text-slate-800"><i class="fa-solid fa-calendar-days text-brand-500 mr-2"></i> Month Wise Value</h3>
+                    </div>
+                    <div class="p-6 flex-grow max-h-[400px] overflow-y-auto no-scrollbar">
+                        <div id="month-summary-list" class="space-y-3">
+                            <!-- Populated by JS -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= TAB 1: FORM LIST & SEARCH ================= -->
+        <div id="tab-list" class="hidden animate-fade-in space-y-6">
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+                <div class="w-full sm:w-1/2 relative">
+                    <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                    <input type="text" id="searchChemist" oninput="filterForms()" class="input-field pl-10 py-2.5 w-full" placeholder="Chemist বা Pharmacy এর নাম দিয়ে খুঁজুন...">
+                </div>
+                <button onclick="createNewForm()" class="w-full sm:w-auto bg-brand-600 hover:bg-brand-700 text-white font-medium py-2.5 px-6 rounded-lg shadow-md transition-colors flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-plus"></i> নতুন ফর্ম তৈরি করুন
+                </button>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm text-left whitespace-nowrap">
+                        <thead class="bg-slate-50 text-slate-700 font-semibold border-b">
+                            <tr>
+                                <th class="px-5 py-4">Chemist Name & Address</th>
+                                <th class="px-5 py-4 text-center">Date</th>
+                                <th class="px-5 py-4 text-center">Products</th>
+                                <th class="px-5 py-4 text-right">Total Value (Tk.)</th>
+                                <th class="px-5 py-4 text-center">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="form-list-body" class="divide-y divide-slate-100">
+                            <!-- Populated by JS -->
+                        </tbody>
+                    </table>
+                </div>
+                <div id="empty-form-state" class="p-12 text-center text-slate-500 hidden">
+                    <i class="fa-solid fa-folder-open text-5xl mb-4 text-slate-300"></i>
+                    <p class="text-lg">কোনো ফর্ম পাওয়া যায়নি।</p>
+                    <p class="text-sm mt-1">নতুন ফর্ম তৈরি করতে উপরের বাটনে ক্লিক করুন।</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= TAB 2: FORM DETAILS (ACTIVE FORM) ================= -->
+        <div id="tab-details" class="hidden animate-fade-in space-y-6">
             
             <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-                <h2 class="text-lg font-bold text-slate-800 mb-4 border-b pb-2">General Information</h2>
+                <div class="flex justify-between items-center border-b pb-2 mb-4">
+                    <h2 class="text-lg font-bold text-slate-800">General Information</h2>
+                    <span class="text-xs bg-green-100 text-green-700 px-2 py-1 rounded font-bold">Active Editing</span>
+                </div>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <label class="input-label">Name of the Sales Center</label>
-                        <input type="text" id="salesCenter" class="input-field" placeholder="e.g., Sylhet Depot" oninput="saveState()">
+                        <input type="text" id="salesCenter" class="input-field" placeholder="e.g., Sylhet Depot" oninput="saveActiveForm()">
                     </div>
                     <div>
                         <label class="input-label">Date</label>
-                        <input type="date" id="formDate" class="input-field" oninput="saveState()">
+                        <input type="date" id="formDate" class="input-field" oninput="saveActiveForm()">
                     </div>
                     <div class="md:col-span-2">
                         <div class="flex justify-between items-center mb-1">
@@ -212,59 +250,34 @@
                                 ✨ Auto-Format
                             </button>
                         </div>
-                        <textarea id="chemistDetails" rows="2" class="input-field resize-none" placeholder="Enter chemist name and full address..." oninput="saveState()"></textarea>
+                        <textarea id="chemistDetails" rows="2" class="input-field resize-none" placeholder="Enter chemist name and full address..." oninput="saveActiveForm()"></textarea>
                     </div>
                 </div>
             </div>
 
-            <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 stagger-1 opacity-0 animate-slide-up">
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
                 <h2 class="text-lg font-bold text-slate-800 mb-4 border-b pb-2">Signatures & Representatives</h2>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div class="space-y-4">
-                        <div>
-                            <label class="input-label">Form filled by (Full Name of MPO/ASM)</label>
-                            <input type="text" id="filledBy" class="input-field" placeholder="e.g., Ali Akbar" oninput="saveState()">
-                        </div>
-                        <div>
-                            <label class="input-label">Mobile No.</label>
-                            <input type="text" id="filledByMobile" class="input-field" placeholder="017XXXXXXX" oninput="saveState()">
-                        </div>
+                        <div><label class="input-label">Form filled by (Full Name of MPO/ASM)</label><input type="text" id="filledBy" class="input-field" placeholder="e.g., Ali Akbar" oninput="saveActiveForm()"></div>
+                        <div><label class="input-label">Mobile No.</label><input type="text" id="filledByMobile" class="input-field" placeholder="017XXXXXXX" oninput="saveActiveForm()"></div>
                     </div>
                     <div class="space-y-4">
-                        <div>
-                            <label class="input-label">Handed over by (On behalf of Chemist)</label>
-                            <input type="text" id="handedBy" class="input-field" placeholder="Chemist Representative Name" oninput="saveState()">
-                        </div>
-                        <div>
-                            <label class="input-label">Mobile No.</label>
-                            <input type="text" id="handedByMobile" class="input-field" placeholder="017XXXXXXX" oninput="saveState()">
-                        </div>
+                        <div><label class="input-label">Handed over by (On behalf of Chemist)</label><input type="text" id="handedBy" class="input-field" placeholder="Chemist Representative Name" oninput="saveActiveForm()"></div>
+                        <div><label class="input-label">Mobile No.</label><input type="text" id="handedByMobile" class="input-field" placeholder="017XXXXXXX" oninput="saveActiveForm()"></div>
                     </div>
                     <div class="space-y-4">
-                        <div>
-                            <label class="input-label">Taken over by (On behalf of UUPL)</label>
-                            <input type="text" id="takenBy" class="input-field" placeholder="UUPL Representative Name" oninput="saveState()">
-                        </div>
-                        <div>
-                            <label class="input-label">Mobile No.</label>
-                            <input type="text" id="takenByMobile" class="input-field" placeholder="017XXXXXXX" oninput="saveState()">
-                        </div>
+                        <div><label class="input-label">Taken over by (On behalf of UUPL)</label><input type="text" id="takenBy" class="input-field" placeholder="UUPL Representative Name" oninput="saveActiveForm()"></div>
+                        <div><label class="input-label">Mobile No.</label><input type="text" id="takenByMobile" class="input-field" placeholder="017XXXXXXX" oninput="saveActiveForm()"></div>
                     </div>
                     <div class="space-y-4">
-                        <div>
-                            <label class="input-label">Replaced vide invoice No.</label>
-                            <input type="text" id="invoiceNo" class="input-field" placeholder="Invoice Number" oninput="saveState()">
-                        </div>
-                        <div>
-                            <label class="input-label">Invoice Date</label>
-                            <input type="date" id="invoiceDate" class="input-field" oninput="saveState()">
-                        </div>
+                        <div><label class="input-label">Replaced vide invoice No.</label><input type="text" id="invoiceNo" class="input-field" placeholder="Invoice Number" oninput="saveActiveForm()"></div>
+                        <div><label class="input-label">Invoice Date</label><input type="date" id="invoiceDate" class="input-field" oninput="saveActiveForm()"></div>
                     </div>
                 </div>
             </div>
 
-            <!-- MPO/ASM specific assignments for value table -->
-            <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 stagger-2 opacity-0 animate-slide-up">
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
                 <h2 class="text-lg font-bold text-slate-800 mb-4 border-b pb-2">Value Table Details</h2>
                 <p class="text-sm text-gray-500 mb-4">Values will be auto-calculated from products. Enter associated personnel details below.</p>
                 <div class="overflow-x-auto">
@@ -284,27 +297,30 @@
                 </div>
             </div>
 
-            <div class="flex justify-end">
-                <button onclick="switchTab('products')" class="ripple bg-brand-600 hover:bg-brand-700 text-white font-medium py-2.5 px-6 rounded-lg shadow-md transition-colors flex items-center gap-2">
+            <div class="flex justify-end gap-3">
+                <button onclick="switchTab('list')" class="bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-medium py-2.5 px-6 rounded-lg transition-colors">
+                    Save & Back
+                </button>
+                <button onclick="switchTab('products')" class="bg-brand-600 hover:bg-brand-700 text-white font-medium py-2.5 px-6 rounded-lg shadow-md transition-colors flex items-center gap-2">
                     Next Step <i class="fa-solid fa-arrow-right"></i>
                 </button>
             </div>
         </div>
 
-        <!-- ================= TAB 2: PRODUCTS ================= -->
+        <!-- ================= TAB 3: PRODUCTS (ACTIVE FORM) ================= -->
         <div id="tab-products" class="hidden animate-fade-in space-y-6">
             
             <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white rounded-xl shadow-sm border border-slate-200 p-4">
                 <div>
                     <h2 class="text-lg font-bold text-slate-800">Product List</h2>
-                    <p class="text-sm text-gray-500">Add all expired products being returned.</p>
+                    <p class="text-sm text-gray-500">Add all expired products for this chemist.</p>
                 </div>
                 <div class="flex flex-wrap gap-2">
                     <input type="file" id="aiFileInput" accept="image/*" class="hidden" onchange="handleImageUpload(event)">
-                    <button onclick="document.getElementById('aiFileInput').click()" id="btn-scan-ai" class="ripple bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 px-4 rounded-lg shadow-sm transition-colors flex items-center gap-2">
+                    <button onclick="document.getElementById('aiFileInput').click()" id="btn-scan-ai" class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 px-4 rounded-lg shadow-sm transition-colors flex items-center gap-2">
                         ✨ Scan Invoice/List
                     </button>
-                    <button onclick="openModal()" class="ripple bg-brand-600 hover:bg-brand-700 text-white font-medium py-2 px-4 rounded-lg shadow-sm transition-colors flex items-center gap-2">
+                    <button onclick="openModal()" class="bg-brand-600 hover:bg-brand-700 text-white font-medium py-2 px-4 rounded-lg shadow-sm transition-colors flex items-center gap-2">
                         <i class="fa-solid fa-plus"></i> Add Product
                     </button>
                 </div>
@@ -340,16 +356,16 @@
             </div>
             
             <div class="flex justify-between">
-                <button onclick="switchTab('details')" class="ripple bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-medium py-2.5 px-6 rounded-lg transition-colors flex items-center gap-2">
+                <button onclick="switchTab('details')" class="bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-medium py-2.5 px-6 rounded-lg transition-colors flex items-center gap-2">
                     <i class="fa-solid fa-arrow-left"></i> Back
                 </button>
-                <button onclick="switchTab('preview')" class="ripple bg-brand-600 hover:bg-brand-700 text-white font-medium py-2.5 px-6 rounded-lg shadow-md transition-colors flex items-center gap-2">
+                <button onclick="switchTab('preview')" class="bg-brand-600 hover:bg-brand-700 text-white font-medium py-2.5 px-6 rounded-lg shadow-md transition-colors flex items-center gap-2">
                     Preview Form <i class="fa-solid fa-print"></i>
                 </button>
             </div>
         </div>
 
-        <!-- ================= TAB 3: PREVIEW & EXPORT ================= -->
+        <!-- ================= TAB 4: PREVIEW ================= -->
         <div id="tab-preview" class="hidden animate-fade-in space-y-6">
             
             <div class="flex flex-col sm:flex-row justify-between items-center gap-4 bg-white rounded-xl shadow-sm border border-slate-200 p-4">
@@ -358,13 +374,13 @@
                     <p class="text-sm text-gray-500">Verify information before printing. Automatically creates new pages for more than 10 products.</p>
                 </div>
                 <div class="flex gap-3">
-                    <button onclick="window.print()" class="ripple bg-brand-600 hover:bg-brand-700 text-white font-medium py-2 px-5 rounded-lg shadow-md transition-colors flex items-center gap-2">
+                    <button onclick="window.print()" class="bg-brand-600 hover:bg-brand-700 text-white font-medium py-2 px-5 rounded-lg shadow-md transition-colors flex items-center gap-2">
                         <i class="fa-solid fa-print"></i> Print / Save PDF
                     </button>
                 </div>
             </div>
 
-            <!-- Virtual Paper Container (Visual only on screen) -->
+            <!-- Virtual Paper Container -->
             <div class="bg-gray-300 p-4 rounded-xl flex flex-col items-center gap-8 overflow-y-auto max-h-[80vh]" id="screen-preview-container">
                 <!-- Pages injected here by JS matching the #print-area -->
             </div>
@@ -412,13 +428,13 @@
                             </div>
 
                             <div>
-                                <label class="input-label">Mfg. Date (MM/YY)</label>
-                                <input type="text" id="pMfg" class="input-field" placeholder="e.g. 05/23" pattern="^(0[1-9]|1[0-2])\/\d{2}$" title="Format: MM/YY">
+                                <label class="input-label">Mfg. Date</label>
+                                <input type="month" id="pMfg" class="input-field" title="Select Manufacturing Month/Year">
                             </div>
 
                             <div>
-                                <label class="input-label">Expiry Date (MM/YY)</label>
-                                <input type="text" id="pExp" class="input-field" placeholder="e.g. 12/25" pattern="^(0[1-9]|1[0-2])\/\d{2}$" title="Format: MM/YY">
+                                <label class="input-label">Expiry Date</label>
+                                <input type="month" id="pExp" class="input-field" title="Select Expiry Month/Year">
                             </div>
 
                             <div>
@@ -441,18 +457,17 @@
                                 <span class="text-xl font-bold text-brand-900 mt-1" id="pCalcValue">Tk. 0.00</span>
                                 <span class="text-[10px] text-gray-500 mt-1">(Trade Price / Pack Size) * Qty</span>
                             </div>
-
                         </form>
                     </div>
                     
                     <div class="bg-slate-50 px-6 py-4 flex flex-col sm:flex-row-reverse gap-3 rounded-b-xl border-t border-slate-200">
-                        <button type="button" onclick="saveProduct(true)" class="ripple bg-brand-600 hover:bg-brand-700 text-white font-medium py-2 px-6 rounded-lg transition-colors shadow-sm">
+                        <button type="button" onclick="saveProduct(true)" class="bg-brand-600 hover:bg-brand-700 text-white font-medium py-2 px-6 rounded-lg transition-colors shadow-sm">
                             Save & Close
                         </button>
-                        <button type="button" onclick="saveProduct(false)" class="ripple bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 px-6 rounded-lg transition-colors shadow-sm">
+                        <button type="button" onclick="saveProduct(false)" class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 px-6 rounded-lg transition-colors shadow-sm">
                             Save & Add Another
                         </button>
-                        <button type="button" onclick="closeModal()" class="ripple bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-medium py-2 px-4 rounded-lg transition-colors sm:mr-auto">
+                        <button type="button" onclick="closeModal()" class="bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-medium py-2 px-4 rounded-lg transition-colors sm:mr-auto">
                             Cancel
                         </button>
                     </div>
@@ -461,95 +476,322 @@
         </div>
     </div>
 
-    <!-- ================= CONFIRMATION MODAL ================= -->
-    <div id="confirmModal" class="fixed inset-0 z-50 hidden" aria-labelledby="modal-title" role="dialog" aria-modal="true">
-        <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" id="confirmBackdrop"></div>
-        <div class="fixed inset-0 z-10 w-screen overflow-y-auto">
-            <div class="flex min-h-full items-center justify-center p-4 text-center sm:p-0">
-                <div class="relative transform overflow-hidden rounded-xl bg-white text-left shadow-2xl transition-all sm:my-8 sm:w-full sm:max-w-md">
-                    <div class="bg-white px-4 pb-4 pt-5 sm:p-6 sm:pb-4">
-                        <div class="sm:flex sm:items-start">
-                            <div class="mx-auto flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-red-100 sm:mx-0 sm:h-10 sm:w-10">
-                                <i class="fa-solid fa-triangle-exclamation text-red-600"></i>
-                            </div>
-                            <div class="mt-3 text-center sm:ml-4 sm:mt-0 sm:text-left">
-                                <h3 class="text-base font-semibold leading-6 text-gray-900">Reset Form Data</h3>
-                                <div class="mt-2">
-                                    <p class="text-sm text-gray-500">Are you sure you want to clear all form details and added products? This action cannot be undone.</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="bg-gray-50 px-4 py-3 sm:flex sm:flex-row-reverse sm:px-6">
-                        <button type="button" onclick="executeReset()" class="inline-flex w-full justify-center rounded-md bg-red-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-500 sm:ml-3 sm:w-auto">Reset Everything</button>
-                        <button type="button" onclick="closeConfirmModal()" class="mt-3 inline-flex w-full justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 sm:mt-0 sm:w-auto">Cancel</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-
-    <!-- ================= ACTUAL PRINT DOM ================= -->
-    <!-- Content injected dynamically via JS for pagination -->
+    <!-- ACTUAL PRINT DOM -->
     <div id="print-area"></div>
 
-
     <script>
-        // ================= STATE MANAGEMENT =================
+        // ================= DATABASE & STATE MANAGEMENT =================
         const GROUPS = ['UHP', 'UMP', 'UD', 'NUV', 'S&N']; 
         
-        let state = {
-            details: {
-                salesCenter: '', formDate: '', chemistDetails: '',
-                filledBy: '', filledByMobile: '',
-                handedBy: '', handedByMobile: '',
-                takenBy: '', takenByMobile: '',
-                invoiceNo: '', invoiceDate: '',
-                groupMeta: {} 
-            },
-            products: []
-        };
-
-        GROUPS.forEach(g => {
-            state.details.groupMeta[g] = { mpo: '', asm: '', action: '' };
-        });
+        let db = []; // Array of form objects
+        let activeFormId = null; // ID of the form currently being edited
 
         // API Key for Gemini (Auto Format & Scan)
         const apiKey = "";
 
-        // ================= INITIALIZATION =================
         document.addEventListener('DOMContentLoaded', () => {
-            loadState();
-            renderGroupMetaFields();
-            updateProductList();
-            updatePreview();
+            migrateOldData(); // Convert old single-form storage to multi-form DB
+            loadDB();
+            switchTab('dashboard'); // Default landing page
         });
 
-        function loadState() {
-            const saved = localStorage.getItem('uupl_form_state');
-            if (saved) {
+        // Convert old structure to new structure if someone updates the app
+        function migrateOldData() {
+            const oldDataStr = localStorage.getItem('uupl_form_state');
+            if (oldDataStr) {
                 try {
-                    const parsed = JSON.parse(saved);
-                    state = { ...state, ...parsed };
+                    const oldData = JSON.parse(oldDataStr);
+                    const newForm = {
+                        id: generateUUID(),
+                        createdAt: new Date().toISOString(),
+                        ...oldData
+                    };
                     
-                    Object.keys(state.details).forEach(key => {
-                        if (key !== 'groupMeta') {
-                            const el = document.getElementById(key);
-                            if (el) el.value = state.details[key];
-                        }
-                    });
+                    if(oldData.products?.length > 0 || oldData.details?.chemistDetails) {
+                        db = [newForm];
+                        localStorage.setItem('uupl_forms_db', JSON.stringify(db));
+                    }
+                    localStorage.removeItem('uupl_form_state');
                 } catch (e) {
-                    console.error("Error loading state", e);
+                    console.error("Migration error", e);
                 }
             }
         }
 
-        function saveState() {
+        function loadDB() {
+            const savedDb = localStorage.getItem('uupl_forms_db');
+            if (savedDb) {
+                try {
+                    db = JSON.parse(savedDb);
+                } catch (e) {
+                    console.error("Error loading DB", e);
+                    db = [];
+                }
+            }
+        }
+
+        function saveDB() {
+            localStorage.setItem('uupl_forms_db', JSON.stringify(db));
+        }
+
+        function generateUUID() {
+            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+                return v.toString(16);
+            });
+        }
+
+        function getActiveForm() {
+            return db.find(f => f.id === activeFormId);
+        }
+
+        // ================= DASHBOARD LOGIC (TEXT/LIST BASED) =================
+        function updateDashboard() {
+            let totalForms = db.length;
+            let totalValue = 0;
+            let totalProducts = 0;
+            
+            let groupValues = { 'UHP': 0, 'UMP': 0, 'UD': 0, 'NUV': 0, 'S&N': 0, 'Others': 0 };
+            let monthValues = {}; // {'YYYY-MM': { value: 0, forms: 0 }}
+
+            // Calculate values
+            db.forEach(form => {
+                totalProducts += form.products.length;
+                
+                // Determine month of this form
+                let m = 'Unknown';
+                if (form.details.formDate) {
+                    const d = new Date(form.details.formDate);
+                    m = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+                }
+
+                if(!monthValues[m]) monthValues[m] = { value: 0, forms: 0 };
+                monthValues[m].forms++;
+
+                form.products.forEach(p => {
+                    const val = (parseFloat(p.tp) / parseFloat(p.pack)) * parseFloat(p.qty);
+                    totalValue += val;
+                    
+                    if(groupValues[p.group] !== undefined) {
+                        groupValues[p.group] += val;
+                    } else {
+                        groupValues['Others'] += val;
+                    }
+
+                    monthValues[m].value += val;
+                });
+            });
+
+            // Update Header Cards
+            document.getElementById('dash-total-forms').innerText = totalForms;
+            document.getElementById('dash-total-value').innerText = `Tk. ${formatMoney(totalValue)}`;
+            document.getElementById('dash-total-products').innerText = totalProducts;
+
+            renderDashboardLists(groupValues, monthValues, totalValue);
+        }
+
+        function renderDashboardLists(groupValues, monthValues, totalValue) {
+            // 1. Render Group List
+            const groupContainer = document.getElementById('group-summary-list');
+            groupContainer.innerHTML = '';
+            
+            const groupColors = {
+                'UHP': 'bg-blue-500', 'UMP': 'bg-purple-500', 'UD': 'bg-pink-500', 
+                'NUV': 'bg-amber-500', 'S&N': 'bg-emerald-500', 'Others': 'bg-slate-500'
+            };
+
+            const sortedGroups = Object.keys(groupValues).sort((a, b) => groupValues[b] - groupValues[a]);
+
+            sortedGroups.forEach(g => {
+                const val = groupValues[g];
+                if (val > 0 || totalValue === 0) { 
+                    const percentage = totalValue > 0 ? ((val / totalValue) * 100).toFixed(1) : 0;
+                    const colorClass = groupColors[g] || 'bg-gray-500';
+                    
+                    groupContainer.innerHTML += `
+                        <div class="flex flex-col gap-1">
+                            <div class="flex justify-between items-center text-sm">
+                                <span class="font-bold text-slate-700">${g}</span>
+                                <span class="font-bold text-brand-700">Tk. ${formatMoney(val)}</span>
+                            </div>
+                            <div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden mt-1">
+                                <div class="${colorClass} h-2 rounded-full transition-all duration-1000" style="width: ${percentage}%"></div>
+                            </div>
+                            <div class="text-right text-xs text-slate-400 font-medium mt-0.5">${percentage}% of total</div>
+                        </div>
+                    `;
+                }
+            });
+
+            if(groupContainer.innerHTML === '') {
+                groupContainer.innerHTML = `<p class="text-center text-slate-400 py-4">No data available</p>`;
+            }
+
+            // 2. Render Month List
+            const monthContainer = document.getElementById('month-summary-list');
+            monthContainer.innerHTML = '';
+
+            const sortedMonths = Object.keys(monthValues).sort().reverse();
+
+            sortedMonths.forEach(m => {
+                const data = monthValues[m];
+                
+                let monthLabel = 'No Date specified';
+                if(m !== 'Unknown') {
+                    const [y, mo] = m.split('-');
+                    const d = new Date(y, parseInt(mo)-1);
+                    monthLabel = d.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+                }
+
+                monthContainer.innerHTML += `
+                    <div class="flex items-center justify-between p-3 rounded-lg border border-slate-100 bg-slate-50/50 hover:bg-brand-50 hover:border-brand-200 transition-colors">
+                        <div class="flex items-center gap-3">
+                            <div class="h-10 w-10 rounded-full bg-white border border-slate-200 text-brand-600 shadow-sm flex items-center justify-center font-bold">
+                                <i class="fa-regular fa-calendar"></i>
+                            </div>
+                            <div>
+                                <h4 class="font-bold text-slate-800">${monthLabel}</h4>
+                                <p class="text-xs text-slate-500 font-medium">${data.forms} Forms Generated</p>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <h4 class="font-bold text-brand-700">Tk. ${formatMoney(data.value)}</h4>
+                        </div>
+                    </div>
+                `;
+            });
+
+            if(monthContainer.innerHTML === '') {
+                monthContainer.innerHTML = `<p class="text-center text-slate-400 py-4">No data available</p>`;
+            }
+        }
+
+        // ================= FORM LIST LOGIC =================
+        function renderFormList(searchTerm = '') {
+            const tbody = document.getElementById('form-list-body');
+            const emptyState = document.getElementById('empty-form-state');
+            tbody.innerHTML = '';
+
+            const filteredDb = db.filter(f => 
+                (f.details.chemistDetails || '').toLowerCase().includes(searchTerm.toLowerCase())
+            ).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+            if (filteredDb.length === 0) {
+                emptyState.classList.remove('hidden');
+            } else {
+                emptyState.classList.add('hidden');
+                
+                filteredDb.forEach(form => {
+                    let totalVal = 0;
+                    form.products.forEach(p => totalVal += (parseFloat(p.tp) / parseFloat(p.pack)) * parseFloat(p.qty));
+                    
+                    const tr = document.createElement('tr');
+                    tr.className = 'hover:bg-slate-50 transition-colors';
+                    tr.innerHTML = `
+                        <td class="px-5 py-4 whitespace-normal min-w-[200px]">
+                            <p class="font-semibold text-slate-800 line-clamp-2">${form.details.chemistDetails || 'Unnamed Chemist'}</p>
+                            <p class="text-xs text-slate-500 mt-1"><i class="fa-solid fa-location-dot"></i> ${form.details.salesCenter || 'N/A'}</p>
+                        </td>
+                        <td class="px-5 py-4 text-center">${formatDateReadable(form.details.formDate)}</td>
+                        <td class="px-5 py-4 text-center">
+                            <span class="bg-indigo-100 text-indigo-700 px-2 py-1 rounded-full text-xs font-bold">${form.products.length} Items</span>
+                        </td>
+                        <td class="px-5 py-4 text-right font-bold text-brand-700">${formatMoney(totalVal)}</td>
+                        <td class="px-5 py-4 text-center space-x-2">
+                            <button onclick="editForm('${form.id}')" class="text-white bg-blue-500 hover:bg-blue-600 px-3 py-1.5 rounded text-sm transition-colors shadow-sm"><i class="fa-solid fa-pen"></i> Edit</button>
+                            <button onclick="deleteForm('${form.id}')" class="text-white bg-red-500 hover:bg-red-600 px-3 py-1.5 rounded text-sm transition-colors shadow-sm"><i class="fa-solid fa-trash"></i></button>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            }
+        }
+
+        function filterForms() {
+            renderFormList(document.getElementById('searchChemist').value);
+        }
+
+        function createNewForm() {
+            activeFormId = generateUUID();
+            const newForm = {
+                id: activeFormId,
+                createdAt: new Date().toISOString(),
+                details: {
+                    salesCenter: '', formDate: '', chemistDetails: '',
+                    filledBy: '', filledByMobile: '', handedBy: '', handedByMobile: '',
+                    takenBy: '', takenByMobile: '', invoiceNo: '', invoiceDate: '',
+                    groupMeta: {}
+                },
+                products: []
+            };
+            GROUPS.forEach(g => newForm.details.groupMeta[g] = { mpo: '', asm: '', action: '' });
+            
+            db.push(newForm);
+            saveDB();
+            
+            loadFormToUI(newForm);
+            enableEditorTabs();
+            switchTab('details');
+            showToast('নতুন ফর্ম তৈরি করা হয়েছে!', 'success');
+        }
+
+        function editForm(id) {
+            activeFormId = id;
+            const form = getActiveForm();
+            loadFormToUI(form);
+            enableEditorTabs();
+            switchTab('details');
+        }
+
+        function deleteForm(id) {
+            if(confirm('Are you sure you want to delete this form entirely?')) {
+                db = db.filter(f => f.id !== id);
+                saveDB();
+                renderFormList(document.getElementById('searchChemist').value);
+                updateDashboard();
+                showToast('ফর্মটি মুছে ফেলা হয়েছে।', 'info');
+            }
+        }
+
+        // ================= ACTIVE FORM LOGIC =================
+        function enableEditorTabs() {
+            ['details', 'products', 'preview'].forEach(t => {
+                const btn = document.getElementById(`tab-btn-${t}`);
+                btn.classList.remove('hidden');
+                btn.disabled = false;
+                btn.classList.add('flex');
+            });
+        }
+        
+        function disableEditorTabs() {
+            ['details', 'products', 'preview'].forEach(t => {
+                const btn = document.getElementById(`tab-btn-${t}`);
+                btn.classList.add('hidden');
+                btn.disabled = true;
+                btn.classList.remove('flex');
+            });
+            activeFormId = null;
+        }
+
+        function loadFormToUI(form) {
             const textFields = ['salesCenter', 'formDate', 'chemistDetails', 'filledBy', 'filledByMobile', 'handedBy', 'handedByMobile', 'takenBy', 'takenByMobile', 'invoiceNo', 'invoiceDate'];
             textFields.forEach(id => {
                 const el = document.getElementById(id);
-                if (el) state.details[id] = el.value;
+                if (el) el.value = form.details[id] || '';
+            });
+            
+            renderGroupMetaFields(form);
+            updateProductList(form);
+        }
+
+        function saveActiveForm() {
+            if(!activeFormId) return;
+            const form = getActiveForm();
+            
+            const textFields = ['salesCenter', 'formDate', 'chemistDetails', 'filledBy', 'filledByMobile', 'handedBy', 'handedByMobile', 'takenBy', 'takenByMobile', 'invoiceNo', 'invoiceDate'];
+            textFields.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) form.details[id] = el.value;
             });
 
             GROUPS.forEach(g => {
@@ -558,62 +800,84 @@
                 const asmEl = document.getElementById(`meta_asm_${safeG}`);
                 const actEl = document.getElementById(`meta_act_${safeG}`);
                 
-                if (mpoEl) state.details.groupMeta[g].mpo = mpoEl.value;
-                if (asmEl) state.details.groupMeta[g].asm = asmEl.value;
-                if (actEl) state.details.groupMeta[g].action = actEl.value;
+                if (mpoEl) form.details.groupMeta[g].mpo = mpoEl.value;
+                if (asmEl) form.details.groupMeta[g].asm = asmEl.value;
+                if (actEl) form.details.groupMeta[g].action = actEl.value;
             });
 
-            localStorage.setItem('uupl_form_state', JSON.stringify(state));
-            updatePreview();
+            saveDB();
         }
 
-        // ================= UI RENDERING =================
-        function renderGroupMetaFields() {
-            const tbody = document.getElementById('group-details-body');
-            tbody.innerHTML = '';
-            
-            GROUPS.forEach(g => {
-                const safeG = g.replace('&', '');
-                const data = state.details.groupMeta[g] || {mpo:'', asm:'', action:''};
-                
-                const tr = document.createElement('tr');
-                tr.className = 'border-b border-slate-100 hover:bg-slate-50 transition-colors';
-                tr.innerHTML = `
-                    <td class="px-4 py-3 font-semibold text-brand-900">${g}</td>
-                    <td class="px-4 py-2"><input type="text" id="meta_mpo_${safeG}" value="${data.mpo}" class="input-field text-sm py-1" oninput="saveState()"></td>
-                    <td class="px-4 py-2"><input type="text" id="meta_asm_${safeG}" value="${data.asm}" class="input-field text-sm py-1" oninput="saveState()"></td>
-                    <td class="px-4 py-2"><input type="text" id="meta_act_${safeG}" value="${data.action}" class="input-field text-sm py-1" oninput="saveState()"></td>
-                `;
-                tbody.appendChild(tr);
-            });
-        }
-
+        // ================= TAB NAVIGATION =================
         function switchTab(tabName) {
-            ['details', 'products', 'preview'].forEach(t => {
-                document.getElementById(`tab-${t}`).classList.add('hidden');
-                document.getElementById(`tab-${t}`).classList.remove('block');
-                document.getElementById(`tab-btn-${t}`).classList.remove('active');
+            if (activeFormId && ['details', 'products'].includes(tabName)) {
+                saveActiveForm();
+            }
+
+            ['dashboard', 'list', 'details', 'products', 'preview'].forEach(t => {
+                const content = document.getElementById(`tab-${t}`);
+                if(content) {
+                    content.classList.add('hidden');
+                    content.classList.remove('block');
+                }
+                const btn = document.getElementById(`tab-btn-${t}`);
+                if(btn) btn.classList.remove('active');
             });
 
             document.getElementById(`tab-${tabName}`).classList.remove('hidden');
             document.getElementById(`tab-${tabName}`).classList.add('block');
             document.getElementById(`tab-btn-${tabName}`).classList.add('active');
 
-            if(tabName === 'preview') {
-                saveState();
-                updatePreview();
+            if (tabName === 'dashboard') {
+                disableEditorTabs();
+                loadDB();
+                updateDashboard();
+            } else if (tabName === 'list') {
+                disableEditorTabs();
+                loadDB();
+                renderFormList();
+            } else if (tabName === 'preview' && activeFormId) {
+                saveActiveForm();
+                updatePreview(getActiveForm());
             }
         }
 
+
         // ================= PRODUCT MANAGEMENT =================
+        function renderGroupMetaFields(form) {
+            const tbody = document.getElementById('group-details-body');
+            tbody.innerHTML = '';
+            
+            GROUPS.forEach(g => {
+                const safeG = g.replace('&', '');
+                const data = form.details.groupMeta[g] || {mpo:'', asm:'', action:''};
+                
+                const tr = document.createElement('tr');
+                tr.className = 'border-b border-slate-100 hover:bg-slate-50 transition-colors';
+                tr.innerHTML = `
+                    <td class="px-4 py-3 font-semibold text-brand-900">${g}</td>
+                    <td class="px-4 py-2"><input type="text" id="meta_mpo_${safeG}" value="${data.mpo}" class="input-field text-sm py-1" oninput="saveActiveForm()"></td>
+                    <td class="px-4 py-2"><input type="text" id="meta_asm_${safeG}" value="${data.asm}" class="input-field text-sm py-1" oninput="saveActiveForm()"></td>
+                    <td class="px-4 py-2"><input type="text" id="meta_act_${safeG}" value="${data.action}" class="input-field text-sm py-1" oninput="saveActiveForm()"></td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
         function calculateValue() {
             const tp = parseFloat(document.getElementById('pTP').value) || 0;
             const pack = parseFloat(document.getElementById('pPack').value) || 1; 
             const qty = parseFloat(document.getElementById('pQty').value) || 0;
-            
             const val = (tp / pack) * qty;
             document.getElementById('pCalcValue').innerText = `Tk. ${formatMoney(val)}`;
             return val;
+        }
+
+        function formatMonthYearInput(yyyy_mm) {
+            if(!yyyy_mm) return '';
+            const [y, m] = yyyy_mm.split('-');
+            if(y && m) return `${m}/${y.substring(2)}`;
+            return yyyy_mm;
         }
 
         function formatMoney(amount) {
@@ -626,22 +890,23 @@
             return d.toLocaleDateString('en-GB');
         }
 
-        function updateProductList() {
+        function updateProductList(form = getActiveForm()) {
+            if(!form) return;
             const tbody = document.getElementById('product-list-body');
             const emptyState = document.getElementById('empty-state');
             const badge = document.getElementById('product-badge');
             
             tbody.innerHTML = '';
-            badge.innerText = state.products.length;
+            badge.innerText = form.products.length;
 
-            if (state.products.length === 0) {
+            if (form.products.length === 0) {
                 emptyState.classList.remove('hidden');
                 return;
             }
             
             emptyState.classList.add('hidden');
 
-            state.products.forEach((p, index) => {
+            form.products.forEach((p, index) => {
                 const val = (parseFloat(p.tp) / parseFloat(p.pack)) * parseFloat(p.qty);
                 const tr = document.createElement('tr');
                 tr.className = 'hover:bg-slate-50 transition-colors stagger-fade';
@@ -652,7 +917,7 @@
                     <td class="px-4 py-3 font-medium text-slate-800">${p.name}</td>
                     <td class="px-4 py-3"><span class="px-2 py-1 rounded bg-slate-100 text-xs font-semibold">${p.group}</span></td>
                     <td class="px-4 py-3 text-center">${p.batch || '-'}</td>
-                    <td class="px-4 py-3 text-center text-xs">${p.mfg || '-'} / ${p.exp || '-'}</td>
+                    <td class="px-4 py-3 text-center text-xs">${formatMonthYearInput(p.mfg)} / ${formatMonthYearInput(p.exp)}</td>
                     <td class="px-4 py-3 text-right">${p.pack}</td>
                     <td class="px-4 py-3 text-right">${p.qty}</td>
                     <td class="px-4 py-3 text-right">${formatMoney(parseFloat(p.tp))}</td>
@@ -678,7 +943,6 @@
             
             modal.classList.remove('hidden');
             void modal.offsetWidth;
-            
             backdrop.classList.remove('opacity-0');
             panel.classList.remove('opacity-0', 'scale-95');
             panel.classList.add('animate-scale-up');
@@ -693,15 +957,13 @@
             panel.classList.add('opacity-0', 'scale-95');
             panel.classList.remove('animate-scale-up');
             
-            setTimeout(() => {
-                modal.classList.add('hidden');
-            }, 300);
+            setTimeout(() => { modal.classList.add('hidden'); }, 300);
         }
 
         function saveProduct(closeModalAfterSave = true) {
-            const form = document.getElementById('productForm');
-            if (!form.checkValidity()) {
-                form.reportValidity();
+            const formDOM = document.getElementById('productForm');
+            if (!formDOM.checkValidity()) {
+                formDOM.reportValidity();
                 return;
             }
 
@@ -709,30 +971,31 @@
                 name: document.getElementById('pName').value,
                 group: document.getElementById('pGroup').value,
                 batch: document.getElementById('pBatch').value,
-                mfg: document.getElementById('pMfg').value,
-                exp: document.getElementById('pExp').value,
+                mfg: document.getElementById('pMfg').value, 
+                exp: document.getElementById('pExp').value, 
                 pack: document.getElementById('pPack').value,
                 qty: document.getElementById('pQty').value,
                 tp: document.getElementById('pTP').value,
             };
 
             const editIndex = parseInt(document.getElementById('editIndex').value);
+            const form = getActiveForm();
             
             if (editIndex >= 0) {
-                state.products[editIndex] = product;
+                form.products[editIndex] = product;
                 showToast('Product updated successfully', 'success');
             } else {
-                state.products.push(product);
+                form.products.push(product);
                 showToast('Product added successfully', 'success');
             }
 
-            saveState();
-            updateProductList();
+            saveDB();
+            updateProductList(form);
 
             if (closeModalAfterSave) {
                 closeModal();
             } else {
-                form.reset();
+                formDOM.reset();
                 document.getElementById('editIndex').value = '-1';
                 document.getElementById('pCalcValue').innerText = 'Tk. 0.00';
                 document.getElementById('pName').focus();
@@ -741,7 +1004,8 @@
         }
 
         function editProduct(index) {
-            const p = state.products[index];
+            const form = getActiveForm();
+            const p = form.products[index];
             document.getElementById('editIndex').value = index;
             document.getElementById('pName').value = p.name;
             document.getElementById('pGroup').value = p.group;
@@ -759,17 +1023,16 @@
 
         function deleteProduct(index) {
             if(confirm("Are you sure you want to remove this product?")) {
-                state.products.splice(index, 1);
-                saveState();
-                updateProductList();
+                const form = getActiveForm();
+                form.products.splice(index, 1);
+                saveDB();
+                updateProductList(form);
                 showToast('Product removed', 'info');
             }
         }
 
         // ================= DYNAMIC MULTI-PAGE PRINT GENERATOR =================
-        function generatePrintPageHTML(pageIndex, totalPages, productsChunk, grandTotalsObj) {
-            
-            // Build 10 rows for the table
+        function generatePrintPageHTML(pageIndex, totalPages, productsChunk, chunkTotalsObj, form) {
             let tableRowsHTML = '';
             for (let i = 0; i < 10; i++) {
                 const p = productsChunk[i];
@@ -780,8 +1043,8 @@
                             <td style="border: 1px solid black; padding: 4px; text-align: left;">${p.name}</td>
                             <td style="border: 1px solid black; padding: 4px; text-align: center;">${p.pack}</td>
                             <td style="border: 1px solid black; padding: 4px; text-align: center;">${p.batch || ''}</td>
-                            <td style="border: 1px solid black; padding: 4px; text-align: center;">${p.mfg || ''}</td>
-                            <td style="border: 1px solid black; padding: 4px; text-align: center;">${p.exp || ''}</td>
+                            <td style="border: 1px solid black; padding: 4px; text-align: center;">${formatMonthYearInput(p.mfg) || ''}</td>
+                            <td style="border: 1px solid black; padding: 4px; text-align: center;">${formatMonthYearInput(p.exp) || ''}</td>
                             <td style="border: 1px solid black; padding: 4px; text-align: center;">${p.qty}</td>
                             <td style="border: 1px solid black; padding: 4px; text-align: right;">${formatMoney(parseFloat(p.tp))}</td>
                             <td style="border: 1px solid black; padding: 4px; text-align: right; padding-right: 6px;">${formatMoney(val)}</td>
@@ -803,12 +1066,10 @@
                 }
             }
 
-            // Generate Group Value Rows
             let valueTableRows = '';
             GROUPS.forEach(g => {
-                const safeG = g.replace('&', '');
-                const sum = grandTotalsObj.groups[g] || 0;
-                const meta = state.details.groupMeta[g] || {mpo: '', asm: '', action: ''};
+                const sum = chunkTotalsObj.groups[g] || 0;
+                const meta = form.details.groupMeta[g] || {mpo: '', asm: '', action: ''};
                 const valStr = sum > 0 ? formatMoney(sum) : '';
                 
                 valueTableRows += `
@@ -821,13 +1082,11 @@
                 `;
             });
 
-            const grandTotalStr = grandTotalsObj.total > 0 ? formatMoney(grandTotalsObj.total) : '';
+            const grandTotalStr = chunkTotalsObj.total > 0 ? formatMoney(chunkTotalsObj.total) : '';
 
-            // Main HTML template for one strictly sized A4 page
             return `
             <div class="print-page bg-white shadow-xl mx-auto flex flex-col justify-between" style="font-family: 'Arial', sans-serif; color: black; font-size: 11px; line-height: 1.3;">
                 <div>
-                    <!-- HEADER BOX -->
                     <div style="display: grid; grid-template-columns: 18% 57% 25%; border: 1.5px solid black; margin-bottom: 12px;">
                         <div style="border-right: 1.5px solid black; padding: 5px; text-align: center; display: flex; flex-direction: column; justify-content: center;">
                             <div style="font-weight: bold; font-size: 22px; letter-spacing: -2px; border: 2px solid black; display: inline-block; padding: 1px 6px; line-height: 1; margin: 0 auto 4px auto; width: fit-content;">
@@ -847,28 +1106,25 @@
                         </div>
                     </div>
 
-                    <!-- Disclaimer -->
                     <div style="text-align: center; font-weight: bold; margin-bottom: 8px; font-size: 11px;">
                         *no replacement will be made on expired imported range of products*
                     </div>
 
-                    <!-- Name and Date Line -->
                     <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
                         <div style="flex-grow: 1;">
-                            Name of the Sales Center <span class="dotted-line" style="width: 70%;">${state.details.salesCenter}</span>
+                            Name of the Sales Center <span class="dotted-line" style="width: 70%;">${form.details.salesCenter}</span>
                         </div>
                         <div style="min-width: 150px;">
-                            Date: <span class="dotted-line" style="width: 100px;">${formatDateReadable(state.details.formDate)}</span>
+                            Date: <span class="dotted-line" style="width: 100px;">${formatDateReadable(form.details.formDate)}</span>
                         </div>
                     </div>
 
                     <div style="margin-bottom: 5px;">List of expired products</div>
 
-                    <!-- Products Table -->
                     <table style="width: 100%; border-collapse: collapse; margin-bottom: 8px;">
                         <thead>
                             <tr>
-                                <th style="width: 30%; border: 1px solid black; padding: 4px; font-weight: bold; background: transparent;">Products Name</th>
+                                <th style="width: 30%; border: 1px solid black; padding: 4px; font-weight: bold;">Products Name</th>
                                 <th style="width: 10%; border: 1px solid black; padding: 4px; font-weight: bold;">Pack Size</th>
                                 <th style="width: 10%; border: 1px solid black; padding: 4px; font-weight: bold;">Batch No</th>
                                 <th style="width: 10%; border: 1px solid black; padding: 4px; font-weight: bold;">Mfg. Date</th>
@@ -885,21 +1141,19 @@
 
                     <div style="margin-bottom: 5px;">Note: Loose strip and sample pack will not be accepted.</div>
                     <div style="margin-bottom: 12px;">
-                        Expired products received from the Chemist: Name & Address: <span class="dotted-line" style="width: 50%;">${state.details.chemistDetails}</span>
+                        Expired products received from the Chemist: Name & Address: <span class="dotted-line" style="width: 50%;">${form.details.chemistDetails}</span>
                         <div style="border-bottom: 1px dotted black; width: 100%; height: 12px;"></div>
                     </div>
 
-                    <!-- Top Signatures -->
                     <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 8px; margin-bottom: 8px; line-height: 1.8;">
-                        <div>Form filled by: <span class="dotted-line" style="width: 60%;">${state.details.filledBy}</span> (Full Name of MPO/ASM)</div>
-                        <div>Mobile No.: <span class="dotted-line" style="width: 80%;">${state.details.filledByMobile}</span></div>
-                        <div>Handed over by: <span class="dotted-line" style="width: 70%;">${state.details.handedBy}</span></div>
-                        <div>Taken over by: <span class="dotted-line" style="width: 70%;">${state.details.takenBy}</span></div>
-                        <div style="padding-left: 20px;">On behalf of Chemist (Full Name) with Mobile No.<span class="dotted-line" style="width: 30%;">${state.details.handedByMobile}</span></div>
-                        <div>On behalf of UUPL (Full Name)<br>Mobile No.: <span class="dotted-line" style="width: 70%;">${state.details.takenByMobile}</span></div>
+                        <div>Form filled by: <span class="dotted-line" style="width: 60%;">${form.details.filledBy}</span> (Full Name of MPO/ASM)</div>
+                        <div>Mobile No.: <span class="dotted-line" style="width: 80%;">${form.details.filledByMobile}</span></div>
+                        <div>Handed over by: <span class="dotted-line" style="width: 70%;">${form.details.handedBy}</span></div>
+                        <div>Taken over by: <span class="dotted-line" style="width: 70%;">${form.details.takenBy}</span></div>
+                        <div style="padding-left: 20px;">On behalf of Chemist (Full Name) with Mobile No.<span class="dotted-line" style="width: 30%;">${form.details.handedByMobile}</span></div>
+                        <div>On behalf of UUPL (Full Name)<br>Mobile No.: <span class="dotted-line" style="width: 70%;">${form.details.takenByMobile}</span></div>
                     </div>
 
-                    <!-- Values Table -->
                     <table style="width: 100%; border-collapse: collapse; margin-top: 10px; margin-bottom: 10px;">
                         <thead>
                             <tr>
@@ -928,7 +1182,6 @@
                     </div>
                 </div>
 
-                <!-- Footer Section pinned to bottom -->
                 <div>
                     <div style="display: flex; justify-content: flex-end; margin-bottom: 15px;">
                         <div style="text-align: center; border-top: 1px solid black; padding-top: 5px; width: 250px;">
@@ -938,7 +1191,7 @@
 
                     <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 5px;">
                         <div style="flex-grow: 1;">
-                            Received expired products have been replaced vide invoice No. <span class="dotted-line" style="width: 30%;">${state.details.invoiceNo}</span> Dated <span class="dotted-line" style="width: 20%;">${formatDateReadable(state.details.invoiceDate)}</span>
+                            Received expired products have been replaced vide invoice No. <span class="dotted-line" style="width: 30%;">${form.details.invoiceNo}</span> Dated <span class="dotted-line" style="width: 20%;">${formatDateReadable(form.details.invoiceDate)}</span>
                         </div>
                         <div style="text-align: center; border-top: 1px solid black; padding-top: 5px; width: 200px;">
                             Signature of SCM with date
@@ -960,57 +1213,42 @@
             </div>`;
         }
 
-        function updatePreview() {
+        function updatePreview(form) {
+            if(!form) return;
             const printContainer = document.getElementById('print-area');
             const screenContainer = document.getElementById('screen-preview-container');
             
-            printContainer.innerHTML = ''; // clear
-            
-            const totalProducts = state.products.length;
+            const totalProducts = form.products.length;
             const itemsPerPage = 10;
             const totalPages = Math.max(1, Math.ceil(totalProducts / itemsPerPage));
 
-            // Generate HTML for each page chunk
             let fullHTML = '';
             for (let i = 0; i < totalPages; i++) {
-                const chunk = state.products.slice(i * itemsPerPage, (i + 1) * itemsPerPage);
+                const chunk = form.products.slice(i * itemsPerPage, (i + 1) * itemsPerPage);
                 
-                // Calculate Totals specifically for THIS page (chunk) only
-                let pageTotalsObj = { groups: {}, total: 0 };
-                GROUPS.forEach(g => pageTotalsObj.groups[g] = 0);
+                let chunkTotalsObj = { groups: {}, total: 0 };
+                GROUPS.forEach(g => chunkTotalsObj.groups[g] = 0);
 
                 chunk.forEach(p => {
                     const val = (parseFloat(p.tp) / parseFloat(p.pack)) * parseFloat(p.qty);
-                    if (pageTotalsObj.groups[p.group] !== undefined) {
-                        pageTotalsObj.groups[p.group] += val;
+                    if (chunkTotalsObj.groups[p.group] !== undefined) {
+                        chunkTotalsObj.groups[p.group] += val;
                     }
-                    pageTotalsObj.total += val;
+                    chunkTotalsObj.total += val;
                 });
 
-                fullHTML += generatePrintPageHTML(i, totalPages, chunk, pageTotalsObj);
+                fullHTML += generatePrintPageHTML(i, totalPages, chunk, chunkTotalsObj, form);
             }
 
             printContainer.innerHTML = fullHTML;
-            screenContainer.innerHTML = fullHTML; // Mirror to UI
+            screenContainer.innerHTML = fullHTML;
         }
 
 
         // ================= UTILITIES & API =================
-        function confirmReset() {
-            document.getElementById('confirmModal').classList.remove('hidden');
-        }
-        function closeConfirmModal() {
-            document.getElementById('confirmModal').classList.add('hidden');
-        }
-        function executeReset() {
-            localStorage.removeItem('uupl_form_state');
-            location.reload();
-        }
-
         function showToast(message, type = 'success') {
             const container = document.getElementById('toast-container');
             const toast = document.createElement('div');
-            
             const colorClass = type === 'success' ? 'bg-green-500' : (type === 'error' ? 'bg-red-500' : 'bg-blue-500');
             const icon = type === 'success' ? 'fa-check-circle' : (type === 'error' ? 'fa-circle-xmark' : 'fa-circle-info');
             
@@ -1018,7 +1256,6 @@
             toast.innerHTML = `<i class="fa-solid ${icon}"></i> <span class="font-medium text-sm">${message}</span>`;
             
             container.appendChild(toast);
-            
             setTimeout(() => {
                 toast.style.animation = 'slideInRight 0.3s ease-in reverse forwards';
                 setTimeout(() => toast.remove(), 300);
@@ -1043,46 +1280,31 @@
             const el = document.getElementById('chemistDetails');
             const btn = document.getElementById('btn-format-chemist');
             if(!el.value.trim()) {
-                showToast("Please enter some text to format.", "info");
-                return;
+                showToast("Please enter some text to format.", "info"); return;
             }
-
             btn.disabled = true;
             btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Formatting...`;
             
             try {
                 const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
                 const prompt = "Format this chemist/pharmacy raw text into a clean professional string with 'Name, Full Address'. Remove redundant conversational words. Return ONLY the cleaned text.";
-                
-                const payload = {
-                    contents: [{ parts: [{ text: prompt + "\n\nRaw text: " + el.value }] }]
-                };
+                const payload = { contents: [{ parts: [{ text: prompt + "\n\nRaw text: " + el.value }] }] };
 
-                const data = await fetchWithRetry(url, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(payload)
-                });
-
+                const data = await fetchWithRetry(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
                 const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+                
                 if(text) {
                     el.value = text.trim();
-                    saveState();
+                    saveActiveForm();
                     showToast("✨ Formatted successfully!", "success");
                 }
-            } catch (err) {
-                console.error(err);
-                showToast("Failed to format text. Please try again.", "error");
-            } finally {
-                btn.disabled = false;
-                btn.innerHTML = `✨ Auto-Format`;
-            }
+            } catch (err) { showToast("Failed to format text. Please try again.", "error");
+            } finally { btn.disabled = false; btn.innerHTML = `✨ Auto-Format`; }
         }
 
         function handleImageUpload(event) {
             const file = event.target.files[0];
             if (!file) return;
-
             const btn = document.getElementById('btn-scan-ai');
             btn.disabled = true;
             btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> ✨ Analyzing...`;
@@ -1091,8 +1313,7 @@
             const reader = new FileReader();
             reader.onload = async (e) => {
                 const base64Data = e.target.result.split(',')[1];
-                const mimeType = file.type;
-                await extractProductsFromImage(base64Data, mimeType);
+                await extractProductsFromImage(base64Data, file.type);
                 event.target.value = '';
                 btn.disabled = false;
                 btn.innerHTML = `✨ Scan Invoice/List`;
@@ -1103,64 +1324,41 @@
         async function extractProductsFromImage(base64Data, mimeType) {
             try {
                 const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
-                const prompt = "Extract the list of pharmaceutical products from this image. Map the data to these fields: name (string), group (must be exactly one of: UHP, UMP, UD, NUV, S&N, or Others), batch (string, default to empty string), mfg (string in MM/YY format), exp (string in MM/YY format), pack (number, default 1), qty (number), tp (number, the total trade price or unit price). If any numbers are missing, try to deduce them or set to 0.";
+                const prompt = "Extract the list of pharmaceutical products from this image. Map the data to these fields: name (string), group (must be exactly one of: UHP, UMP, UD, NUV, S&N, or Others), batch (string, default to empty string), mfg (string in YYYY-MM format), exp (string in YYYY-MM format), pack (number, default 1), qty (number), tp (number). If any numbers are missing, try to deduce them or set to 0.";
                 
                 const payload = {
-                    contents: [{
-                        role: "user",
-                        parts: [
-                            { text: prompt },
-                            { inlineData: { mimeType: mimeType, data: base64Data } }
-                        ]
-                    }],
+                    contents: [{ role: "user", parts: [ { text: prompt }, { inlineData: { mimeType: mimeType, data: base64Data } } ] }],
                     generationConfig: {
                         responseMimeType: "application/json",
                         responseSchema: {
-                            type: "ARRAY",
-                            items: {
+                            type: "ARRAY", items: {
                                 type: "OBJECT",
-                                properties: {
-                                    name: { type: "STRING" },
-                                    group: { type: "STRING" },
-                                    batch: { type: "STRING" },
-                                    mfg: { type: "STRING" },
-                                    exp: { type: "STRING" },
-                                    pack: { type: "NUMBER" },
-                                    qty: { type: "NUMBER" },
-                                    tp: { type: "NUMBER" }
-                                },
+                                properties: { name: { type: "STRING" }, group: { type: "STRING" }, batch: { type: "STRING" }, mfg: { type: "STRING" }, exp: { type: "STRING" }, pack: { type: "NUMBER" }, qty: { type: "NUMBER" }, tp: { type: "NUMBER" } },
                                 required: ["name", "group", "pack", "qty", "tp"]
                             }
                         }
                     }
                 };
 
-                const data = await fetchWithRetry(url, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(payload)
-                });
-
+                const data = await fetchWithRetry(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
                 const jsonStr = data.candidates?.[0]?.content?.parts?.[0]?.text;
+                
                 if(jsonStr) {
                     const extractedProducts = JSON.parse(jsonStr);
+                    const form = getActiveForm();
                     let count = 0;
                     extractedProducts.forEach(p => {
-                        state.products.push({
+                        form.products.push({
                             name: p.name || 'Unknown Product',
                             group: ['UHP', 'UMP', 'UD', 'NUV', 'S&N', 'Others'].includes(p.group) ? p.group : 'Others',
-                            batch: p.batch || '',
-                            mfg: p.mfg || '',
-                            exp: p.exp || '',
-                            pack: parseFloat(p.pack) || 1,
-                            qty: parseFloat(p.qty) || 1,
-                            tp: parseFloat(p.tp) || 0
+                            batch: p.batch || '', mfg: p.mfg || '', exp: p.exp || '',
+                            pack: parseFloat(p.pack) || 1, qty: parseFloat(p.qty) || 1, tp: parseFloat(p.tp) || 0
                         });
                         count++;
                     });
                     
-                    saveState();
-                    updateProductList();
+                    saveDB();
+                    updateProductList(form);
                     showToast(`✨ Successfully imported ${count} products!`, "success");
                 }
             } catch (err) {
